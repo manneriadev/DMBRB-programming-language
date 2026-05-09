@@ -1,0 +1,68 @@
+module test
+
+    struct Point
+        x: int32
+        y: int32
+    end
+
+    function sum(a: int32, b: int32)::int32
+        return a + b
+    end
+
+    function fact(n: int32)::int32
+        var result: int32 = 1
+        var i = 1
+
+        while i <= n
+            result = result * i
+            i = i + 1
+        end
+
+        return result
+    end
+
+    function main()::int32
+        var p: struct Point = [1,2]
+        
+
+        var a: int32 = 10
+        var b: int32 = 20
+
+        var c = sum(a, b)
+        var d = fact(5)
+
+        p = [3,4]
+
+        var e = (a + b) * c / d - 3
+
+        if e > 0
+            print(e)
+        else
+            print(0)
+        end
+
+        when
+            e == 0 -> 
+                print(0)
+            end
+            e == 10 -> 
+                print(10)
+            end
+            e == 100 -> 
+                print(100)
+            end
+        end
+
+        var i: int32 = 0
+        for i = 0:i < 10:i = i + 1
+            if i == 5
+                break
+            end
+
+            continue
+        end
+
+        return 0
+    end
+
+end
