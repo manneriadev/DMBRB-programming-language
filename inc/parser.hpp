@@ -18,7 +18,7 @@ private:
     std::size_t pos;
     bool failed;
 
-private:
+
     Token* cur() const;
     void next();
     bool at_end() const;

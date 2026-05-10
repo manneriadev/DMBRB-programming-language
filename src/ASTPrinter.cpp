@@ -77,20 +77,26 @@ std::string ASTPrinter::type_to_string(const Type& type){
 void ASTPrinter::print(Program& program){
     out << "PROGRAM\n";
 
-    for(auto& module : program.modules){
+    for(auto& item : program.items){
         current_space = 0;
         current_value = 0;
 
-        print_node("MODULE[" + module->name + "]");
+        if(auto* module = dynamic_cast<Module*>(item.get())){
+            print_node("MODULE[" + module->name + "]");
 
-        current_space += 5;
+            current_space += 5;
 
-        for(auto& decl : module->decls){
-            current_value = 1;
-            decl->accept(*this);
+            for(auto& decl : module->decls){
+                current_value = 1;
+                decl->accept(*this);
+            }
+
+            current_space -= 5;
         }
-
-        current_space -= 5;
+        else {
+            current_value = 1;
+            item->accept(*this);
+        }
     }
 }
 
@@ -103,13 +109,14 @@ void ASTPrinter::visit(VariableExpr& node){
 }
 
 void ASTPrinter::visit(BinaryExpr& node){
+    print_node("{Binary}[" + binary_to_string(node.op) + "]");
+    
     if(node.left){
         push(2);
         node.left->accept(*this);
         current_space -= 5;
     }
 
-    print_node("{Binary}[" + binary_to_string(node.op) + "]");
 
     if(node.right){
         push(1);

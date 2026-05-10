@@ -262,8 +262,8 @@ struct Module : Node{
     void accept(Visitor& v) override;
 };
 
-struct Program : Node{
-    std::vector<std::unique_ptr<Module>> modules;
+struct Program : Node {
+    std::vector<std::unique_ptr<Node>> items;
     void accept(Visitor& v) override;
 };
 
@@ -328,4 +328,4 @@ inline void VarDecl::accept(Visitor& v) { v.visit(*this); }
 inline void FunctionDecl::accept(Visitor& v) { v.visit(*this); }
 inline void StructDecl::accept(Visitor& v) { v.visit(*this); }
 inline void Module::accept(Visitor& v) { for (auto& d : decls) d->accept(v); }
-inline void Program::accept(Visitor& v) { for (auto& m : modules) m->accept(v); }
+inline void Program::accept(Visitor& v) { for (auto& item : items) item->accept(v); }

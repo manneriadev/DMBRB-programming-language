@@ -1,3 +1,5 @@
+var x = 32
+
 module test
 
     struct Point
@@ -24,6 +26,7 @@ module test
     function main()::int32
         var p: struct Point = [1,2]
         
+        print(p.x)
 
         var a: int32 = 10
         var b: int32 = 20
@@ -66,3 +69,9 @@ module test
     end
 
 end
+
+function main()::void
+    return 0
+end
+
+var x = 42

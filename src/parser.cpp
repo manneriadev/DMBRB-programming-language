@@ -10,32 +10,30 @@ Parser::Parser(std::vector<Token>& tokens) : tokens(&tokens), pos(0), failed(fal
 std::unique_ptr<Program> Parser::parse() 
 {
     auto program = std::make_unique<Program>();
-    auto main_module = std::make_unique<Module>();
-    main_module->name = "main";
-
+    
     while(!at_end()) 
     {
         if(eat(TokenType::MODULE)) 
         {
             auto module = parse_module();
             if(failed) return nullptr;
-            program->modules.push_back(std::move(module));
+
+            program->items.push_back(std::move(module));
             continue;
         }
 
-        if(!is_decl_start(cur()->type)) 
+        if(is_decl_start(cur()->type)) 
         {
-            fail("expected module or declaration");
-            return nullptr;
+            auto decl = parse_decl();
+            if(failed) return nullptr;
+
+            program->items.push_back(std::move(decl));
+            continue;
         }
 
-        auto decl = parse_decl();
-        if(failed) return nullptr;
-
-        main_module->decls.push_back(std::move(decl));
+        fail("expected module or declaration");
+        return nullptr;
     }
-
-    program->modules.push_back(std::move(main_module));
 
     if(failed) return nullptr;
     return program; 
