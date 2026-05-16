@@ -1,77 +1,82 @@
-var x = 32
-
-module test
-
-    struct Point
+module math 
+begin
+    struct Point 
+    begin
         x: int32
         y: int32
     end
 
-    function sum(a: int32, b: int32)::int32
+    function sum(a: int32, b: int32)::int32 
+    begin
         return a + b
     end
 
-    function fact(n: int32)::int32
+    function fact(n: int32)::int32 
+    begin
         var result: int32 = 1
-        var i = 1
-
-        while i <= n
+        var i: int32 = 1
+        while i <= n 
+        begin
             result = result * i
             i = i + 1
         end
-
         return result
     end
+end
 
-    function main()::int32
-        var p: struct Point = [1,2]
-        
-        print(p.x)
+var x: int32 = 10
+var y: int32 = 20
 
-        var a: int32 = 10
-        var b: int32 = 20
+function main()::int32 
+begin
+    var a: int32 = 10
+    var b: int32 = 20
+    var c = math.sum(a, b)
+    var d = math.fact(5)
 
-        var c = sum(a, b)
-        var d = fact(5)
+    var e = (a + b) * c - d
 
-        p = [3,4]
-
-        var e = (a + b) * c / d - 3
-
-        if e > 0
-            print(e)
-        else
-            print(0)
-        end
-
-        when
-            e == 0 -> 
-                print(0)
-            end
-            e == 10 -> 
-                print(10)
-            end
-            e == 100 -> 
-                print(100)
-            end
-        end
-
-        var i: int32 = 0
-        for i = 0:i < 10:i = i + 1
-            if i == 5
-                break
-            end
-
-            continue
-        end
-
-        return 0
+    if e > 0 
+    begin
+        var r = math.sum(e, 1)
+    else 
+    begin
+        var r = math.sum(0, 1)
     end
 
-end
+    when
+        e == 0 -> 
+        begin
+            var z: int32 = 0
+        end
+        e == 10 -> 
+        begin
+            var z: int32 = 10
+        end
+        else -> 
+        begin
+            var z: int32 = 99
+        end
+    end
 
-function main()::void
+    var i: int32 = 0
+    for i = 0:10 
+    begin
+        if i == 5 
+        begin
+            break
+        end
+        var t = math.sum(i, 1)
+    end
+
+    while a > 0 
+    begin
+        a = a - 1
+        if a == 5 
+        begin
+            continue
+        end
+    end
+
     return 0
 end
-
-var x = 42

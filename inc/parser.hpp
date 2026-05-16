@@ -18,6 +18,7 @@ private:
     std::size_t pos;
     bool failed;
 
+    void get_pos(Node* node);
 
     Token* cur() const;
     void next();

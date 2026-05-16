@@ -77,6 +77,7 @@ enum class TokenType{
     BREAK,
     CONTINUE,
     FUNCTION,
+    BEGIN,
     END,
     TRUE,
     FALSE,

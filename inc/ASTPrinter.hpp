@@ -17,6 +17,7 @@ public:
     void visit(BinaryExpr&) override;
     void visit(UnaryExpr&) override;
     void visit(AssignmentExpr&) override;
+    void visit(MethodCallExpr&) override;
     void visit(CallExpr&) override;
     void visit(MemberAccessExpr&) override;
     void visit(IndexExpr&) override;
@@ -40,6 +41,9 @@ public:
     void visit(VarDecl&) override;
     void visit(FunctionDecl&) override;
     void visit(StructDecl&) override;
+
+    void visit(Module&) override;
+    void visit(Program&) override;
 
 private:
     std::ostream& out;

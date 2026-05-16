@@ -31,6 +31,20 @@ struct AnyStruct{
     std::vector<StructField> fields;
 };
 
+struct AnyModule{
+    std::string name;
+    std::unordered_map<std::string, AnyVariable> variables;
+    std::unordered_map<std::string, AnyFunction> functions;
+    std::unordered_map<std::string, AnyStruct> structs;
+    std::unordered_map<std::string, AnyModule> modules;
+};
+
+struct VisionPart{
+    std::unordered_map<std::string, AnyVariable> variables;
+    std::unordered_map<std::string, AnyFunction> functions;
+    std::unordered_map<std::string, AnyStruct> structs;
+};
+
 class analyzer : public Visitor{
 
 public:
@@ -38,28 +52,35 @@ public:
 
 private:
 
-    std::vector<std::unordered_map<std::string, AnyVariable>> variable_vision;
-    std::unordered_map<std::string , AnyFunction> functions;
-    std::unordered_map<std::string , AnyStruct> structs;
+    std::vector<VisionPart> visions;
+    std::unordered_map<std::string, AnyModule> global_modules;
 
-    FunctionDecl* current_func = nullptr;
+    Type current_expr_type;
+    FunctionDecl* current_function = nullptr;
+    
     bool inside_loop = false;
-
     bool has_return = false;
+    int loop_depth = 0;
+    
     Type expected_return_type;
+    bool failed = false;
 
 
     void push_new_vision();
     void pop_last_vision();
 
-    bool declare_variable(const AnyVariable variable);
-    bool declare_function(const AnyFunction variable);
-    bool declare_struct(const AnyStruct variable);
+    bool declare_variable(VarDecl& node);
+    bool declare_function(FunctionDecl& node);
+    bool declare_struct(StructDecl& node);
     AnyVariable* resolve_variable(const std::string& name);
     AnyFunction* resolve_function(const std::string& name);
     AnyStruct* resolve_struct(const std::string& name);
+    AnyModule* resolve_module(const std::string& name);
+    AnyModule* resolve_module_chain(Expr* expr);
+    bool is_module_name(const std::string& name);
 
-    bool type_equal(const Type& a, const Type& b) const; 
+    bool is_lvalue(Expr& expr);
+    bool is_none_type(const Type& t);
     bool is_integer(const Type& type) const; 
     bool is_float(const Type& type) const; 
     bool is_numeric(const Type& type) const; 
@@ -67,7 +88,11 @@ private:
     bool is_string(const Type& type) const;
     
     Type visit_expr(Expr& node);
-    void error(const std::string& message);
+    void error(const std::string& message, const Node* node);
+
+    bool type_equal(const Type& a, const Type& b) const;
+    bool can_convert(const Type& from, const Type& to) const;
+    bool is_comparable(const Type& a, const Type& b) const;
 
     //expression
 
@@ -78,6 +103,7 @@ private:
     void visit(AssignmentExpr& node) override; 
     void visit(CallExpr& node) override; 
     void visit(MemberAccessExpr& node) override; 
+    void visit(MethodCallExpr& node) override;
     void visit(IndexExpr& node) override; 
     void visit(TernaryExpr& node) override; 
     void visit(CastExpr& node) override; 
@@ -101,4 +127,7 @@ private:
     void visit(VarDecl& node) override; 
     void visit(FunctionDecl& node) override; 
     void visit(StructDecl& node) override;
+
+    void visit(Module& node) override;
+    void visit(Program& node) override;
 };

@@ -5,11 +5,21 @@
 #include <cstdlib>
 #include <utility>
 
+void Parser::get_pos(Node* node)
+{
+    if(cur())
+    {
+        node->line = cur()->line;
+        node->column = cur()->column;
+    }
+}
+
 Parser::Parser(std::vector<Token>& tokens) : tokens(&tokens), pos(0), failed(false) {}
 
 std::unique_ptr<Program> Parser::parse() 
 {
     auto program = std::make_unique<Program>();
+    get_pos(program.get());
     
     while(!at_end()) 
     {
@@ -285,6 +295,7 @@ assign_type Parser::map_assign(TokenType type) const
 std::unique_ptr<Module> Parser::parse_module() 
 {
     auto module = std::make_unique<Module>();
+    get_pos(module.get());
 
     if(!match(TokenType::IDENTIFIER)) 
     {
@@ -295,8 +306,22 @@ std::unique_ptr<Module> Parser::parse_module()
     module->name = cur()->lexeme;
     next();
 
+    if(!eat(TokenType::BEGIN))
+    {
+        fail("expected 'begin' after module name");
+        return nullptr;
+    }
+
     while(!at_end() && !match(TokenType::END))
     {
+        if(eat(TokenType::MODULE))
+        {
+            auto submodule = parse_module();
+            if(failed) return nullptr;
+            module->submodules.push_back(std::move(submodule));
+            continue;
+        }
+
         if(!is_decl_start(cur()->type)) 
         {
             fail("only declarations are allowed inside module body");
@@ -333,6 +358,7 @@ std::unique_ptr<Decl> Parser::parse_decl()
 std::unique_ptr<VarDecl> Parser::parse_var_decl() 
 {
     auto decl = std::make_unique<VarDecl>();
+    get_pos(decl.get());
 
     if(!eat(TokenType::VAR)) 
     {
@@ -380,6 +406,7 @@ std::unique_ptr<VarDecl> Parser::parse_var_decl()
 std::unique_ptr<FunctionDecl> Parser::parse_function_decl() 
 {
     auto decl = std::make_unique<FunctionDecl>();
+    get_pos(decl.get());
 
     if(!eat(TokenType::FUNCTION))
     {
@@ -434,6 +461,12 @@ std::unique_ptr<FunctionDecl> Parser::parse_function_decl()
         decl->return_type.arrays.clear();
     }
 
+    if(!eat(TokenType::BEGIN))
+    {
+        fail("expected 'begin' after function header");
+        return nullptr;
+    }
+
     decl->body = parse_block(TokenType::END);
     if(failed) return nullptr;
     
@@ -449,6 +482,7 @@ std::unique_ptr<FunctionDecl> Parser::parse_function_decl()
 std::unique_ptr<StructDecl> Parser::parse_struct_decl()
 {
     auto decl = std::make_unique<StructDecl>();
+    get_pos(decl.get());
 
     if(!eat(TokenType::STRUCT)) 
     {
@@ -463,6 +497,12 @@ std::unique_ptr<StructDecl> Parser::parse_struct_decl()
 
     decl->name = cur()->lexeme;
     next();
+
+    if(!eat(TokenType::BEGIN))
+    {
+        fail("expected 'begin' after struct name");
+        return nullptr;
+    }
 
     while(!at_end() && !match(TokenType::END))
     {
@@ -616,6 +656,7 @@ Type Parser::parse_type()
 std::unique_ptr<BlockStmt> Parser::parse_block(TokenType stop1, TokenType stop2, TokenType stop3) 
 {
     auto block = std::make_unique<BlockStmt>();
+    get_pos(block.get());
 
     while(!at_end() && !is_stop(cur()->type, {stop1, stop2, stop3})) 
     {
@@ -650,8 +691,18 @@ std::unique_ptr<Stmt> Parser::parse_stmt()
     if(match(TokenType::WHILE)) return parse_while_stmt();
     if(match(TokenType::FOR)) return parse_for_stmt();
     if(match(TokenType::RETURN)) return parse_return_stmt();
-    if(eat(TokenType::BREAK)) return std::make_unique<BreakStmt>();
-    if(eat(TokenType::CONTINUE)) return std::make_unique<ContinueStmt>();
+    if(eat(TokenType::BREAK))
+    {
+        auto br = std::make_unique<BreakStmt>();
+        get_pos(br.get());
+        return br;
+    }
+    if(eat(TokenType::CONTINUE))
+    {
+        auto cont = std::make_unique<ContinueStmt>();
+        get_pos(cont.get());
+        return cont;
+    }
     if(is_expr_start(cur() ? cur()->type : TokenType::ERROR)) return parse_expr_stmt();
 
     fail("expected statement");
@@ -661,6 +712,7 @@ std::unique_ptr<Stmt> Parser::parse_stmt()
 std::unique_ptr<Stmt> Parser::parse_if_stmt() 
 {
     auto stmt = std::make_unique<IfStmt>();
+    get_pos(stmt.get());
 
     if(!eat(TokenType::IF))
     {
@@ -671,11 +723,23 @@ std::unique_ptr<Stmt> Parser::parse_if_stmt()
     stmt->cond = parse_expression();
     if(failed) return nullptr;
 
+    if(!eat(TokenType::BEGIN))
+    {
+        fail("expected 'begin' after if condition");
+        return nullptr;
+    }
+
     stmt->then_block = parse_block(TokenType::ELSE, TokenType::END);
     if(failed) return nullptr;
 
     if(eat(TokenType::ELSE)) 
     {
+        if(!eat(TokenType::BEGIN))
+        {
+            fail("expected 'begin' after else");
+            return nullptr;
+        }
+
         stmt->else_block = parse_block(TokenType::END);
         if(failed) return nullptr;
     }
@@ -692,6 +756,7 @@ std::unique_ptr<Stmt> Parser::parse_if_stmt()
 std::unique_ptr<Stmt> Parser::parse_when_stmt() 
 {
     auto stmt = std::make_unique<WhenStmt>();
+    get_pos(stmt.get());
 
     if(!eat(TokenType::WHEN)) 
     {
@@ -706,6 +771,12 @@ std::unique_ptr<Stmt> Parser::parse_when_stmt()
             if(!eat(TokenType::ARROW)) 
             {
                 fail("expected '->' after else");
+                return nullptr;
+            }
+
+            if(!eat(TokenType::BEGIN))
+            {
+                fail("expected 'begin' after else ->");
                 return nullptr;
             }
 
@@ -728,6 +799,12 @@ std::unique_ptr<Stmt> Parser::parse_when_stmt()
         if(!eat(TokenType::ARROW)) 
         {
             fail("expected '->' after condition");
+            return nullptr;
+        }
+
+        if(!eat(TokenType::BEGIN))
+        {
+            fail("expected 'begin' after ->");
             return nullptr;
         }
 
@@ -755,6 +832,7 @@ std::unique_ptr<Stmt> Parser::parse_when_stmt()
 std::unique_ptr<Stmt> Parser::parse_while_stmt() 
 {
     auto stmt = std::make_unique<WhileStmt>();
+    get_pos(stmt.get());
 
     if(!eat(TokenType::WHILE))
     {
@@ -764,7 +842,12 @@ std::unique_ptr<Stmt> Parser::parse_while_stmt()
 
     stmt->cond = parse_expression();
     if(failed) return nullptr;
-    
+
+    if(!eat(TokenType::BEGIN))
+    {
+        fail("expected 'begin' after while condition");
+        return nullptr;
+    }
 
     stmt->body = parse_block(TokenType::END);
     if(failed) return nullptr;
@@ -823,10 +906,17 @@ std::unique_ptr<Stmt> Parser::parse_for_stmt()
     }
 
     auto stmt = std::make_unique<ForStmt>();
+    get_pos(stmt.get());
     stmt->var_name = var_name;
     stmt->start = std::move(start_expr);
     stmt->end = std::move(end_expr);
     stmt->step = std::move(step_expr);
+
+    if(!eat(TokenType::BEGIN))
+    {
+        fail("expected 'begin' after for codition");
+        return nullptr;
+    }
 
     stmt->body = parse_block(TokenType::END);
     if(failed) return nullptr;
@@ -843,6 +933,7 @@ std::unique_ptr<Stmt> Parser::parse_for_stmt()
 std::unique_ptr<Stmt> Parser::parse_return_stmt()
 {
     auto stmt = std::make_unique<ReturnStmt>();
+    get_pos(stmt.get());
 
     if(!eat(TokenType::RETURN))
     {
@@ -862,6 +953,7 @@ std::unique_ptr<Stmt> Parser::parse_return_stmt()
 std::unique_ptr<Stmt> Parser::parse_expr_stmt()
 {
     auto stmt = std::make_unique<ExprStmt>();
+    get_pos(stmt.get());
     stmt->expr = parse_expression();
     if(failed) return nullptr;
     return stmt;
@@ -906,6 +998,7 @@ std::unique_ptr<Expr> Parser::parse_binary(int min_priority)
             if(failed) return nullptr;
 
             auto node = std::make_unique<TernaryExpr>();
+            get_pos(node.get());
             node->cond = std::move(left);
             node->thenExpr = std::move(then_expr);
             node->elseExpr = std::move(else_expr);
@@ -922,6 +1015,7 @@ std::unique_ptr<Expr> Parser::parse_binary(int min_priority)
         if(is_assignment(op))
         {
             auto node = std::make_unique<AssignmentExpr>();
+            get_pos(node.get());
             node->target = std::move(left);
             node->value = std::move(right);
             node->type = map_assign(op);
@@ -931,6 +1025,7 @@ std::unique_ptr<Expr> Parser::parse_binary(int min_priority)
         }
 
         auto node = std::make_unique<BinaryExpr>();
+        get_pos(node.get());
         node->left = std::move(left);
         node->right = std::move(right);
         node->op = map_binary(op);
@@ -950,6 +1045,7 @@ std::unique_ptr<Expr> Parser::parse_unary()
         next();
 
         auto node = std::make_unique<UnaryExpr>();
+        get_pos(node.get());
         node->op = map_unary(op);
         node->expr = parse_unary();
 
@@ -978,6 +1074,7 @@ std::unique_ptr<Expr> Parser::parse_postfix()
             }
 
             auto node = std::make_unique<MemberAccessExpr>();
+            get_pos(node.get());
             node->object = std::move(expr);
             node->field = cur()->lexeme;
 
@@ -990,6 +1087,7 @@ std::unique_ptr<Expr> Parser::parse_postfix()
         if(eat(TokenType::LSQUAREPAREN))
         {
             auto node = std::make_unique<IndexExpr>();
+            get_pos(node.get());
             node->object = std::move(expr);
 
             node->index = parse_expression();
@@ -1006,37 +1104,70 @@ std::unique_ptr<Expr> Parser::parse_postfix()
             continue;
         }
 
-        if(eat(TokenType::LPAREN)) 
+        if(eat(TokenType::LPAREN))
         {
-            auto* v = dynamic_cast<VariableExpr*>(expr.get()); // get ret pointer and dc also
-            if(!v)
-            { 
-                fail("call target must be a simple identifier"); 
-                return nullptr; 
-            }
-
-            auto call = std::make_unique<CallExpr>();
-            call->name = v->name;
-
-            if(!match(TokenType::RPAREN))
+            if(auto* mem = dynamic_cast<MemberAccessExpr*>(expr.get()))
             {
-                while(true)
+                auto call = std::make_unique<MethodCallExpr>();
+                get_pos(call.get());
+                call->method = mem->field;
+                call->object = std::move(mem->object);
+
+                if(!match(TokenType::RPAREN))
                 {
-                    call->args.push_back(parse_expression());
-
-                    if(failed) return nullptr;
-                    if(!eat(TokenType::COMMA)) break;
-                    if(match(TokenType::RPAREN)) break;
+                    while(true)
+                    {
+                        call->args.push_back(parse_expression());
+                        if(failed) return nullptr;
+                        if(!eat(TokenType::COMMA)) break;
+                        if(match(TokenType::RPAREN)) break;
+                    }
                 }
-            }
 
-            if(!eat(TokenType::RPAREN))
+                if(!eat(TokenType::RPAREN)) 
+                { 
+                    fail("expected ')' after arguments"); 
+                    return nullptr; 
+                }
+                expr = std::move(call);
+            }
+            else if(auto* var = dynamic_cast<VariableExpr*>(expr.get()))
             {
-                fail("expected ')' after arguments");
+                auto call = std::make_unique<CallExpr>();
+                get_pos(call.get());
+                call->name = var->name;
+
+                if(!match(TokenType::RPAREN))
+                {
+                    while(true)
+                    {
+                        call->args.push_back(parse_expression());
+                        if(failed) return nullptr;
+                        if(!eat(TokenType::COMMA)) break;
+                        if(match(TokenType::RPAREN)) break;
+                    }
+                }
+
+                if(!eat(TokenType::RPAREN)) { fail("expected ')' after arguments"); return nullptr; }
+                expr = std::move(call);
+            }
+            else
+            {
+                fail("call target must be identifier or member access");
                 return nullptr;
             }
 
-            expr = std::move(call);
+            continue;
+        }
+
+        if(eat(TokenType::COLONCOLON))
+        {
+            Type t = parse_type();
+            if(failed) return nullptr;
+            auto node = std::make_unique<CastExpr>();
+            node->expr = std::move(expr);
+            node->target_type = t;
+            expr = std::move(node);
             continue;
         }
 
@@ -1051,6 +1182,7 @@ std::unique_ptr<Expr> Parser::parse_primary()
     if(match(TokenType::INT_LITERAL))
     {
         auto node = std::make_unique<LiteralExpr>();
+        get_pos(node.get());
         node->value = static_cast<int64_t>(std::stoll(cur()->lexeme));
 
         next();
@@ -1060,6 +1192,7 @@ std::unique_ptr<Expr> Parser::parse_primary()
     if(match(TokenType::FLOAT_LITERAL))
     {
         auto node = std::make_unique<LiteralExpr>();
+        get_pos(node.get());
         node->value = std::stod(cur()->lexeme);
 
         next();
@@ -1069,6 +1202,7 @@ std::unique_ptr<Expr> Parser::parse_primary()
     if(match(TokenType::STRING_LITERAL))
     {
         auto node = std::make_unique<LiteralExpr>();
+        get_pos(node.get());
         node->value = cur()->lexeme;
 
         next();
@@ -1078,6 +1212,7 @@ std::unique_ptr<Expr> Parser::parse_primary()
     if(match(TokenType::CHAR_LITERAL))
     {
         auto node = std::make_unique<LiteralExpr>();
+        get_pos(node.get());
         node->value = cur()->lexeme.empty() ? '\0' : cur()->lexeme[0];
 
         next();
@@ -1087,6 +1222,7 @@ std::unique_ptr<Expr> Parser::parse_primary()
     if(match(TokenType::TRUE))
     {
         auto node = std::make_unique<LiteralExpr>();
+        get_pos(node.get());
         node->value = true;
 
         next();
@@ -1096,6 +1232,7 @@ std::unique_ptr<Expr> Parser::parse_primary()
     if(match(TokenType::FALSE))
     {
         auto node = std::make_unique<LiteralExpr>();
+        get_pos(node.get());
         node->value = false;
 
         next();
@@ -1105,34 +1242,15 @@ std::unique_ptr<Expr> Parser::parse_primary()
     if(match(TokenType::NONE))
     {
         next();
-        return std::make_unique<EmptyExpr>();
-    }
-
-    if(match(TokenType::COLONCOLON))
-    {
-        next();
-
-        Type type{};
-
-        if(!try_parse_type(type))
-        {
-            fail("expected type after '::'");
-            return nullptr;
-        }
-
-        auto expr = parse_primary();
-        if(failed) return nullptr;
-
-        auto node = std::make_unique<CastExpr>();
-        node->target_type = type;
-        node->expr = std::move(expr);
-
-        return node;
+        auto none = std::make_unique<EmptyExpr>();
+        get_pos(none.get());
+        return none;
     }
 
     if(match(TokenType::IDENTIFIER))
     {
         auto node = std::make_unique<VariableExpr>();
+        get_pos(node.get());
         node->name = cur()->lexeme;
 
         next();
@@ -1142,6 +1260,7 @@ std::unique_ptr<Expr> Parser::parse_primary()
     if(eat(TokenType::LSQUAREPAREN))
     {
         auto arr = std::make_unique<ArrayLiteralExpr>();
+        get_pos(arr.get());
 
         if(!match(TokenType::RSQUAREPAREN))
         {

@@ -15,6 +15,7 @@ static std::unordered_map<std::string, TokenType> keywords = {
     {"break", TokenType::BREAK},
     {"continue", TokenType::CONTINUE},
     {"function", TokenType::FUNCTION},
+    {"begin", TokenType::BEGIN},
     {"end", TokenType::END},
     {"true", TokenType::TRUE},
     {"false", TokenType::FALSE},

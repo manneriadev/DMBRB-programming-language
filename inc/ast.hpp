@@ -76,7 +76,7 @@ enum class binary_oper{
     XOR, PIPE, AMP,
     EQEQ, NOTEQ,
     GREATER, LESS, GREATEREQ, LESSEQ,
-    AMPERAMPER, PIPEPIPE
+    AMPERAMPER, PIPEPIPE,
 };
 
 enum class unary_oper{
@@ -98,6 +98,9 @@ enum class assign_type{
 struct Node{
     virtual ~Node() = default;
     virtual void accept(Visitor& v) = 0;
+
+    size_t line = 0;
+    size_t column = 0;
 };
 
 struct Expr : Node{};
@@ -145,6 +148,13 @@ struct CallExpr : Expr{
 struct MemberAccessExpr : Expr{
     std::unique_ptr<Expr> object;
     std::string field;
+    void accept(Visitor& v) override;
+};
+
+struct MethodCallExpr : Expr{
+    std::unique_ptr<Expr> object;
+    std::string method;
+    std::vector<std::unique_ptr<Expr>> args;
     void accept(Visitor& v) override;
 };
 
@@ -259,6 +269,7 @@ struct StructDecl : Decl{
 struct Module : Node{
     std::string name;
     std::vector<std::unique_ptr<Decl>> decls;
+    std::vector<std::unique_ptr<Module>> submodules;
     void accept(Visitor& v) override;
 };
 
@@ -278,6 +289,7 @@ struct Visitor{
     virtual void visit(AssignmentExpr&) = 0;
     virtual void visit(CallExpr&) = 0;
     virtual void visit(MemberAccessExpr&) = 0;
+    virtual void visit(MethodCallExpr&) = 0;
     virtual void visit(IndexExpr&) = 0;
     virtual void visit(TernaryExpr&) = 0;
     virtual void visit(CastExpr&) = 0;
@@ -300,6 +312,11 @@ struct Visitor{
     virtual void visit(FunctionDecl&) = 0;
     virtual void visit(StructDecl&) = 0;
 
+    // module/program
+
+    virtual void visit(Program&) = 0;
+    virtual void visit(Module&) = 0;
+
     virtual ~Visitor() = default;
 };
 
@@ -310,6 +327,7 @@ inline void UnaryExpr::accept(Visitor& v) { v.visit(*this); }
 inline void AssignmentExpr::accept(Visitor& v) { v.visit(*this); }
 inline void CallExpr::accept(Visitor& v) { v.visit(*this); }
 inline void MemberAccessExpr::accept(Visitor& v) { v.visit(*this); }
+inline void MethodCallExpr::accept(Visitor& v) { v.visit(*this); }
 inline void IndexExpr::accept(Visitor& v) { v.visit(*this); }
 inline void TernaryExpr::accept(Visitor& v) { v.visit(*this); }
 inline void CastExpr::accept(Visitor& v) { v.visit(*this); }
@@ -327,5 +345,5 @@ inline void ContinueStmt::accept(Visitor& v) { v.visit(*this); }
 inline void VarDecl::accept(Visitor& v) { v.visit(*this); }
 inline void FunctionDecl::accept(Visitor& v) { v.visit(*this); }
 inline void StructDecl::accept(Visitor& v) { v.visit(*this); }
-inline void Module::accept(Visitor& v) { for (auto& d : decls) d->accept(v); }
+inline void Module::accept(Visitor& v) { v.visit(*this); }
 inline void Program::accept(Visitor& v) { for (auto& item : items) item->accept(v); }
