@@ -85,6 +85,7 @@ enum class TokenType{
     CONST,
     MODULE,
     NONE,
+    SELF,
 
     //types
 
@@ -105,7 +106,7 @@ enum class TokenType{
     STRUCT,
 
     // other
-
+    NEWLINE,
     ERROR,
     END_TOKEN
 };

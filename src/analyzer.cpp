@@ -37,7 +37,21 @@ bool analyzer::declare_variable(VarDecl& node)
     if(has_init)
     {
         Type init_type = visit_expr(*node.init);
-        if(has_type)
+
+        if(is_none_type(init_type))
+        {
+            if(!has_type) // var x = none  -> pointer or optional?
+            {
+                error("cannot find type from none", &node);
+                return false;
+            }
+            if(!final_type.is_optional && !final_type.is_pointer)
+            {
+                error("cannot initialize non-optional non-pointer with none", &node);
+                return false;
+            }
+        }
+        else if(has_type)
         {
             if(!can_convert(init_type, final_type))
             {
@@ -111,6 +125,19 @@ bool analyzer::declare_struct(StructDecl& node)
     }
 
     current[node.name] = st;
+
+    auto prev_self = current_self_type;
+    bool prev_inside = inside_method;
+
+    current_self_type.base = InnerType::STRUCT;
+    inside_method = true;
+    current_self_type.struct_name = node.name;
+
+    for(auto& method: node.decls) method->accept(*this);
+
+    current_self_type = prev_self;
+    inside_method = prev_inside;
+
     return true;
 }
 
@@ -192,6 +219,7 @@ bool analyzer::is_lvalue(Expr& expr)
     }
     if(dynamic_cast<MemberAccessExpr*>(&expr)) return true;
     if(dynamic_cast<IndexExpr*>(&expr)) return true;
+    if(dynamic_cast<DerefExpr*>(&expr)) return true;
     return false;
 }
 
@@ -258,7 +286,7 @@ void analyzer::error(const std::string& message, const Node* node)
 
 bool analyzer::type_equal(const Type& a, const Type& b) const
 {
-    return a.struct_name == b.struct_name && a.base == b.base && a.arrays.size() == b.arrays.size() && a.is_optional == b.is_optional;
+    return a.struct_name == b.struct_name && a.base == b.base && a.arrays.size() == b.arrays.size() && a.is_optional == b.is_optional && a.is_pointer == b.is_pointer;
 }
 
 bool analyzer::can_convert(const Type& from, const Type& to) const
@@ -280,6 +308,30 @@ void analyzer::analyze(Program& program)
 }
 
 // expressions
+
+void analyzer::visit(AddrOfExpr& node)
+{
+    Type t = visit_expr(*node.ref);
+    if(!is_lvalue(*node.ref))
+    {
+        error("cannot take address of non-lvalue", &node);
+        return;
+    }
+    t.is_pointer = true;
+    current_expr_type = t;
+}
+
+void analyzer::visit(DerefExpr& node)
+{
+    Type t = visit_expr(*node.ref);
+    if(!t.is_pointer)
+    {
+        error("cannot dereference non-pointer type", &node);
+        return;
+    }
+    t.is_pointer = false;
+    current_expr_type = t;
+}
 
 void analyzer::visit(LiteralExpr& node)
 {
@@ -327,6 +379,17 @@ void analyzer::visit(VariableExpr& node)
     current_expr_type = v->type;
 }
 
+void analyzer::visit(SelfExpr& node)
+{
+    if(!inside_method)
+    {
+        error("cannot use SELF outside functions method: ", &node);
+        return;
+    }
+
+    current_expr_type = current_self_type;
+}
+
 void analyzer::visit(BinaryExpr& node) 
 {
     Type left = visit_expr(*node.left);
@@ -338,15 +401,34 @@ void analyzer::visit(BinaryExpr& node)
         return;
     }
 
-    if(!can_convert(left, right) && !can_convert(right, left))
+    if(!left.is_pointer && !right.is_pointer)
     {
-        error("type mismatch in binary expression", &node);
-        return;
+        if(!can_convert(left, right) && !can_convert(right, left))
+        {
+            error("type mismatch in binary expression", &node);
+            return;
+        }
     }
 
     switch(node.op)
     {
         case binary_oper::PLUS:
+            if(left.is_pointer && right.is_pointer)
+            {
+                error("cannot add two pointers", &node);
+                return;
+            }
+            if(left.is_pointer && is_integer(right))
+            {
+                current_expr_type = left;
+                return;
+            }
+            if(right.is_pointer && is_integer(left))
+            {
+                current_expr_type = right;
+                return;
+            }
+
             if(is_numeric(left) && is_numeric(right))
             {
                 current_expr_type = (is_float(left) || is_float(right)) ? Type{InnerType::FLOAT64} : Type{InnerType::INT64};
@@ -361,7 +443,31 @@ void analyzer::visit(BinaryExpr& node)
 
             error("invalid '+' operands", &node);
             return;
+
         case binary_oper::MINUS:
+            if(left.is_pointer && right.is_pointer)
+            {
+                error("cannot subtract two pointers", &node);
+                return;
+            }
+            if(left.is_pointer && is_integer(right))
+            {
+                current_expr_type = left;
+                return;
+            }
+            if(right.is_pointer)
+            {
+                error("cannot use pointer as right operand of subtraction", &node);
+                return;
+            }
+            if(is_numeric(left) && is_numeric(right))
+            {
+                current_expr_type = (is_float(left) || is_float(right)) ? Type{InnerType::FLOAT64} : Type{InnerType::INT64};
+                return;
+            }
+            error("arithmetic operator requires numeric types", &node);
+            return;
+
         case binary_oper::STAR:
         case binary_oper::SLASH:
         case binary_oper::PERCENT:
@@ -501,12 +607,11 @@ void analyzer::visit(AssignmentExpr& node)
 
     if(is_none_type(right))
     {
-        if(!left.is_optional)
+        if(!left.is_optional && !left.is_pointer)
         {
-            error("cannot assign 'none' to non-optional type", &node);
+            error("cannot assign 'none' to non-optional non-pointer type", &node);
             return;
         }
-
         current_expr_type = left;
         return;
     }
@@ -936,8 +1041,7 @@ void analyzer::visit(Module& node)
     {
         visit(*sub);
         auto it = global_modules.find(sub->name);
-        if(it != global_modules.end())
-            mod.modules[sub->name] = it->second;
+        if(it != global_modules.end()) mod.modules[sub->name] = it->second;
     }
 
     global_modules[node.name] = mod;

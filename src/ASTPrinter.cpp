@@ -104,10 +104,31 @@ std::string ASTPrinter::type_to_string(const Type& type)
         base = "[" + base + (dim.is_dynamic ? ";]" : ";N]");
 
     if(type.is_optional) base += "?";
+    if(type.is_pointer) base += "*";
     return base;
 }
 
-// expressions
+void ASTPrinter::visit(AddrOfExpr& node)
+{
+    print_node("AddrOf");
+    if(node.ref)
+    {
+        push(1);
+        node.ref->accept(*this);
+        current_space -= 5;
+    }
+}
+
+void ASTPrinter::visit(DerefExpr& node)
+{
+    print_node("Deref");
+    if(node.ref)
+    {
+        push(1);
+        node.ref->accept(*this);
+        current_space -= 5;
+    }
+}
 
 void ASTPrinter::visit(LiteralExpr&)
 {
@@ -117,6 +138,11 @@ void ASTPrinter::visit(LiteralExpr&)
 void ASTPrinter::visit(VariableExpr& node)
 {
     print_node("Var: " + node.name);
+}
+
+void ASTPrinter::visit(SelfExpr&)
+{
+    print_node("Self");
 }
 
 void ASTPrinter::visit(BinaryExpr& node)
@@ -190,25 +216,32 @@ void ASTPrinter::visit(EmptyExpr&)
     print_node("None");
 }
 
-// statements
-
 void ASTPrinter::visit(BlockStmt& node)
 {
     print_node("Block");
     current_space += 5;
-    for(auto& item : node.items) { current_value = 1; item->accept(*this); }
+    for(auto& item : node.items)
+    {
+        current_value = 1;
+        item->accept(*this);
+    }
     current_space -= 5;
 }
 
 void ASTPrinter::visit(ExprStmt& node)
 {
-    if(node.expr) { push(1); node.expr->accept(*this); current_space -= 5; }
+    if(node.expr)
+    {
+        push(1);
+        node.expr->accept(*this);
+        current_space -= 5;
+    }
 }
 
 void ASTPrinter::visit(IfStmt& node)
 {
     print_node("If");
-    push(2); node.cond->accept(*this);       current_space -= 5;
+    push(2); node.cond->accept(*this); current_space -= 5;
     push(node.else_block ? 2 : 1); node.then_block->accept(*this); current_space -= 5;
     if(node.else_block) { push(1); node.else_block->accept(*this); current_space -= 5; }
 }
@@ -253,15 +286,18 @@ void ASTPrinter::visit(ReturnStmt& node)
 void ASTPrinter::visit(BreakStmt&)    { print_node("Break"); }
 void ASTPrinter::visit(ContinueStmt&) { print_node("Continue"); }
 
-// declarations
-
 void ASTPrinter::visit(VarDecl& node)
 {
     std::string text = "Var: " + node.name;
     if(node.has_type) text += " : " + type_to_string(node.type.type);
     if(node.type.is_const) text += " [const]";
     print_node(text);
-    if(node.init) { push(1); node.init->accept(*this); current_space -= 5; }
+    if(node.init)
+    {
+        push(1);
+        node.init->accept(*this);
+        current_space -= 5;
+    }
 }
 
 void ASTPrinter::visit(FunctionDecl& node)
@@ -274,7 +310,11 @@ void ASTPrinter::visit(FunctionDecl& node)
         current_value = 1;
         print_node("Arg: " + arg.name + " : " + type_to_string(arg.type.type));
     }
-    if(node.body) node.body->accept(*this);
+    if(node.body)
+    {
+        current_value = 1;
+        node.body->accept(*this);
+    }
     current_space -= 5;
 }
 
@@ -287,17 +327,20 @@ void ASTPrinter::visit(StructDecl& node)
         current_value = 1;
         print_node("Field: " + field.name + " : " + type_to_string(field.type.type));
     }
+    for(auto& decl : node.decls)
+    {
+        current_value = 1;
+        print_node("Functions: " + decl->name + " :: " + type_to_string(decl->return_type));
+    }
     current_space -= 5;
 }
-
-// program / module
 
 void ASTPrinter::visit(Module& node)
 {
     print_node("Module: " + node.name);
     current_space += 5;
-    for(auto& sub : node.submodules) { current_value = 1; sub->accept(*this); }
-    for(auto& decl : node.decls)    { current_value = 1; decl->accept(*this); }
+    for(auto& sub : node.submodules)  { current_value = 1; sub->accept(*this); }
+    for(auto& decl : node.decls)     { current_value = 1; decl->accept(*this); }
     current_space -= 5;
 }
 

@@ -57,6 +57,7 @@ struct Type{
     std::vector<ArrayDim> arrays;
     bool is_optional = false;
     bool is_array = false; // true when [elem_type; size]
+    bool is_pointer = false;
 };
 
 struct arg_type{
@@ -109,6 +110,16 @@ struct Decl : Node{};
 
 // EXPRESSIONS
 
+struct DerefExpr : Expr{ // *expr
+    std::unique_ptr<Expr> ref; 
+    void accept(Visitor& v) override;
+};
+
+struct AddrOfExpr : Expr{ // &expr
+    std::unique_ptr<Expr> ref; 
+    void accept(Visitor& v) override;
+};
+
 struct LiteralExpr : Expr{
     std::variant<int64_t, double, bool, std::string, char> value;
     void accept(Visitor& v) override;
@@ -116,6 +127,10 @@ struct LiteralExpr : Expr{
 
 struct VariableExpr : Expr{
     std::string name;
+    void accept(Visitor& v) override;
+};
+
+struct SelfExpr : Expr{
     void accept(Visitor& v) override;
 };
 
@@ -261,6 +276,7 @@ struct FunctionDecl : Decl{
 struct StructDecl : Decl{
     std::string name;
     std::vector<pair_arg> fields;
+    std::vector<std::unique_ptr<FunctionDecl>> decls;
     void accept(Visitor& v) override;
 };
 
@@ -282,8 +298,11 @@ struct Program : Node {
 
 struct Visitor{
     // expressions
+    virtual void visit(AddrOfExpr&) = 0;
+    virtual void visit(DerefExpr&) = 0;
     virtual void visit(LiteralExpr&) = 0;
     virtual void visit(VariableExpr&) = 0;
+    virtual void visit(SelfExpr&) = 0;
     virtual void visit(BinaryExpr&) = 0;
     virtual void visit(UnaryExpr&) = 0;
     virtual void visit(AssignmentExpr&) = 0;
@@ -320,8 +339,11 @@ struct Visitor{
     virtual ~Visitor() = default;
 };
 
+inline void AddrOfExpr::accept(Visitor& v) { v.visit(*this); }
+inline void DerefExpr::accept(Visitor& v) { v.visit(*this); }
 inline void LiteralExpr::accept(Visitor& v) { v.visit(*this); }
 inline void VariableExpr::accept(Visitor& v) { v.visit(*this); }
+inline void SelfExpr::accept(Visitor& v) { v.visit(*this); }
 inline void BinaryExpr::accept(Visitor& v) { v.visit(*this); }
 inline void UnaryExpr::accept(Visitor& v) { v.visit(*this); }
 inline void AssignmentExpr::accept(Visitor& v) { v.visit(*this); }

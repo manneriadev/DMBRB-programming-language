@@ -19,6 +19,7 @@ private:
     bool failed;
 
     void get_pos(Node* node);
+    void skip_newlines();
 
     Token* cur() const;
     void next();

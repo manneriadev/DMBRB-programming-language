@@ -58,14 +58,11 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        std::cout << "\nAST\n\n";
         ASTPrinter printer;
-        printer.print(*program);
-
         analyzer sem;
         sem.analyze(*program);
-        std::cout << "done\n";
-
+        if(sem.get_status() == true) return 1;
+        std::cout << "\nAST\n\n";
         printer.print(*program);
     }
     catch(const std::exception& ex)

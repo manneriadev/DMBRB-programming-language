@@ -49,6 +49,7 @@ class analyzer : public Visitor{
 
 public:
     void analyze(Program& program);
+    bool get_status() { return failed; }
 
 private:
 
@@ -56,15 +57,16 @@ private:
     std::unordered_map<std::string, AnyModule> global_modules;
 
     Type current_expr_type;
+    Type current_self_type;
     FunctionDecl* current_function = nullptr;
     
     bool inside_loop = false;
+    bool inside_method = false;
     bool has_return = false;
     int loop_depth = 0;
     
     Type expected_return_type;
     bool failed = false;
-
 
     void push_new_vision();
     void pop_last_vision();
@@ -82,7 +84,7 @@ private:
     bool is_lvalue(Expr& expr);
     bool is_none_type(const Type& t);
     bool is_integer(const Type& type) const; 
-    bool is_float(const Type& type) const; 
+    bool is_float(const Type& type) const;
     bool is_numeric(const Type& type) const; 
     bool is_bool(const Type& type) const;
     bool is_string(const Type& type) const;
@@ -96,8 +98,11 @@ private:
 
     //expression
 
+    void visit(AddrOfExpr& node) override;
+    void visit(DerefExpr& node) override;
     void visit(LiteralExpr& node) override; 
     void visit(VariableExpr& node) override; 
+    void visit(SelfExpr& node) override; 
     void visit(BinaryExpr& node) override; 
     void visit(UnaryExpr& node) override; 
     void visit(AssignmentExpr& node) override; 

@@ -5,6 +5,11 @@
 #include <cstdlib>
 #include <utility>
 
+void Parser::skip_newlines()
+{
+    while(match(TokenType::NEWLINE)) next();
+}
+
 void Parser::get_pos(Node* node)
 {
     if(cur())
@@ -23,6 +28,9 @@ std::unique_ptr<Program> Parser::parse()
     
     while(!at_end()) 
     {
+        skip_newlines();
+        if(at_end()) break;
+
         if(eat(TokenType::MODULE)) 
         {
             auto module = parse_module();
@@ -146,7 +154,10 @@ bool Parser::is_expr_start(TokenType type) const
         || type == TokenType::MINUS
         || type == TokenType::NOT
         || type == TokenType::TILDA
-        || type == TokenType::COLONCOLON;
+        || type == TokenType::COLONCOLON
+        || type == TokenType::SELF
+        || type == TokenType::STAR
+        || type == TokenType::AMP;
 }
 
 bool Parser::is_type_start(TokenType type) const 
@@ -305,6 +316,7 @@ std::unique_ptr<Module> Parser::parse_module()
 
     module->name = cur()->lexeme;
     next();
+    skip_newlines();
 
     if(!eat(TokenType::BEGIN))
     {
@@ -314,6 +326,9 @@ std::unique_ptr<Module> Parser::parse_module()
 
     while(!at_end() && !match(TokenType::END))
     {
+        skip_newlines();
+        if(at_end() || match(TokenType::END)) break;
+
         if(eat(TokenType::MODULE))
         {
             auto submodule = parse_module();
@@ -334,6 +349,7 @@ std::unique_ptr<Module> Parser::parse_module()
         module->decls.push_back(std::move(decl));
     }
 
+    skip_newlines();
     if(!eat(TokenType::END)) 
     {
         fail("expected 'end' to close module");
@@ -389,7 +405,7 @@ std::unique_ptr<VarDecl> Parser::parse_var_decl()
 
     if(eat(TokenType::EQ))
     {
-        decl->init = parse_expression();
+        decl->init = parse_binary(2); // early it ate = as assign in assign when decl var , *var = *var , *var = *var as var*var = var* var ... 
         if(failed) return nullptr;
         decl->has_init = true;
     }
@@ -461,6 +477,7 @@ std::unique_ptr<FunctionDecl> Parser::parse_function_decl()
         decl->return_type.arrays.clear();
     }
 
+    skip_newlines();
     if(!eat(TokenType::BEGIN))
     {
         fail("expected 'begin' after function header");
@@ -470,6 +487,7 @@ std::unique_ptr<FunctionDecl> Parser::parse_function_decl()
     decl->body = parse_block(TokenType::END);
     if(failed) return nullptr;
     
+    skip_newlines();
     if(!eat(TokenType::END))
     {
         fail("expected 'end' to close function");
@@ -497,6 +515,7 @@ std::unique_ptr<StructDecl> Parser::parse_struct_decl()
 
     decl->name = cur()->lexeme;
     next();
+    skip_newlines();
 
     if(!eat(TokenType::BEGIN))
     {
@@ -504,12 +523,30 @@ std::unique_ptr<StructDecl> Parser::parse_struct_decl()
         return nullptr;
     }
 
-    while(!at_end() && !match(TokenType::END))
+    while(!at_end() && !match(TokenType::END) && !match(TokenType::FUNCTION))
     {
+        skip_newlines();
+        if(at_end() || match(TokenType::END) || match(TokenType::FUNCTION)) break;
         decl->fields.push_back(parse_pair_arg());
         if(failed) return nullptr;
     }
 
+    while(!at_end() && !match(TokenType::END))
+    {
+        skip_newlines();
+        if(at_end() || match(TokenType::END)) break;
+        if(!match(TokenType::FUNCTION))
+        {
+            fail("expected function declaration in struct");
+            return nullptr;
+        }
+
+        auto method = parse_function_decl();
+        if(failed) return nullptr;
+        decl->decls.push_back(std::move(method));
+    }
+
+    skip_newlines();
     if(!eat(TokenType::END)) {
         fail("expected 'end' to close struct");
         return nullptr;
@@ -637,9 +674,8 @@ bool Parser::try_parse_type(Type& out)
     }
 
     next();
-
     if(eat(TokenType::QUESTION)) type.is_optional = true;
-
+    if(!type.is_optional && eat(TokenType::STAR)) type.is_pointer = true;
     out = type;
     return true;
 }
@@ -660,6 +696,9 @@ std::unique_ptr<BlockStmt> Parser::parse_block(TokenType stop1, TokenType stop2,
 
     while(!at_end() && !is_stop(cur()->type, {stop1, stop2, stop3})) 
     {
+        skip_newlines();
+        if(at_end() || is_stop(cur()->type, {stop1, stop2, stop3})) break;
+
         if(is_decl_start(cur()->type)) 
         {
             auto decl = parse_decl();
@@ -723,6 +762,7 @@ std::unique_ptr<Stmt> Parser::parse_if_stmt()
     stmt->cond = parse_expression();
     if(failed) return nullptr;
 
+    skip_newlines();
     if(!eat(TokenType::BEGIN))
     {
         fail("expected 'begin' after if condition");
@@ -732,8 +772,10 @@ std::unique_ptr<Stmt> Parser::parse_if_stmt()
     stmt->then_block = parse_block(TokenType::ELSE, TokenType::END);
     if(failed) return nullptr;
 
+    skip_newlines();
     if(eat(TokenType::ELSE)) 
     {
+        skip_newlines();
         if(!eat(TokenType::BEGIN))
         {
             fail("expected 'begin' after else");
@@ -744,6 +786,7 @@ std::unique_ptr<Stmt> Parser::parse_if_stmt()
         if(failed) return nullptr;
     }
 
+    skip_newlines();
     if(!eat(TokenType::END)) 
     {
         fail("expected 'end' to close if");
@@ -766,14 +809,19 @@ std::unique_ptr<Stmt> Parser::parse_when_stmt()
 
     while(!at_end() && !match(TokenType::END)) 
     {
+        skip_newlines();
+        if(match(TokenType::END)) break;
+
         if(eat(TokenType::ELSE)) 
         {
+            skip_newlines();
             if(!eat(TokenType::ARROW)) 
             {
                 fail("expected '->' after else");
                 return nullptr;
             }
 
+            skip_newlines();
             if(!eat(TokenType::BEGIN))
             {
                 fail("expected 'begin' after else ->");
@@ -783,6 +831,7 @@ std::unique_ptr<Stmt> Parser::parse_when_stmt()
             auto body = parse_block(TokenType::END);
             if(failed) return nullptr;
 
+            skip_newlines();
             if(!eat(TokenType::END)) 
             {
                 fail("expected 'end' after else block");
@@ -796,12 +845,14 @@ std::unique_ptr<Stmt> Parser::parse_when_stmt()
         auto cond = parse_expression();
         if(failed) return nullptr;
 
+        skip_newlines();
         if(!eat(TokenType::ARROW)) 
         {
             fail("expected '->' after condition");
             return nullptr;
         }
 
+        skip_newlines();
         if(!eat(TokenType::BEGIN))
         {
             fail("expected 'begin' after ->");
@@ -811,6 +862,7 @@ std::unique_ptr<Stmt> Parser::parse_when_stmt()
         auto body = parse_block(TokenType::END);
         if(failed) return nullptr;
 
+        skip_newlines();
         if(!eat(TokenType::END)) 
         {
             fail("expected 'end' after case block");
@@ -820,6 +872,7 @@ std::unique_ptr<Stmt> Parser::parse_when_stmt()
         stmt->cases.push_back(std::make_pair(std::move(cond), std::move(body)));
     }
 
+    skip_newlines();
     if(!eat(TokenType::END)) 
     {
         fail("expected 'end' to close when");
@@ -843,6 +896,7 @@ std::unique_ptr<Stmt> Parser::parse_while_stmt()
     stmt->cond = parse_expression();
     if(failed) return nullptr;
 
+    skip_newlines();
     if(!eat(TokenType::BEGIN))
     {
         fail("expected 'begin' after while condition");
@@ -852,7 +906,7 @@ std::unique_ptr<Stmt> Parser::parse_while_stmt()
     stmt->body = parse_block(TokenType::END);
     if(failed) return nullptr;
     
-
+    skip_newlines();
     if(!eat(TokenType::END)) 
     {
         fail("expected 'end' to close while");
@@ -912,6 +966,7 @@ std::unique_ptr<Stmt> Parser::parse_for_stmt()
     stmt->end = std::move(end_expr);
     stmt->step = std::move(step_expr);
 
+    skip_newlines();
     if(!eat(TokenType::BEGIN))
     {
         fail("expected 'begin' after for codition");
@@ -921,6 +976,7 @@ std::unique_ptr<Stmt> Parser::parse_for_stmt()
     stmt->body = parse_block(TokenType::END);
     if(failed) return nullptr;
 
+    skip_newlines();
     if(!eat(TokenType::END)) 
     {
         fail("expected 'end' to close for");
@@ -975,6 +1031,11 @@ std::unique_ptr<Expr> Parser::parse_binary(int min_priority)
     while(cur())
     {
         TokenType op = cur()->type;
+
+        if(op == TokenType::NEWLINE) // meet \n and then parse new expr/stmt
+        {
+            break;
+        }
 
         int prio = priority_of(op);
         if(prio == 0 || prio < min_priority) break;
@@ -1051,6 +1112,26 @@ std::unique_ptr<Expr> Parser::parse_unary()
 
         if(failed) return nullptr;
 
+        return node;
+    }
+
+    if(match(TokenType::AMP))
+    {
+        next();
+        auto node = std::make_unique<AddrOfExpr>();
+        get_pos(node.get());
+        node->ref = parse_unary();
+        if(failed) return nullptr;
+        return node;
+    }
+
+    if(match(TokenType::STAR))
+    {
+        next();
+        auto node = std::make_unique<DerefExpr>();
+        get_pos(node.get());
+        node->ref = parse_unary();
+        if(failed) return nullptr;
         return node;
     }
 
@@ -1281,6 +1362,14 @@ std::unique_ptr<Expr> Parser::parse_primary()
         }
 
         return arr;
+    }
+
+    if(match(TokenType::SELF))
+    {
+        auto node = std::make_unique<SelfExpr>();
+        get_pos(node.get());
+        next();
+        return node;
     }
 
     fail("expected expression");

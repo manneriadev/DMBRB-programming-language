@@ -12,8 +12,11 @@ public:
     void print(Program& program);
 
     // expressions
+    void visit(AddrOfExpr&) override;
+    void visit(DerefExpr&) override;
     void visit(LiteralExpr&) override;
     void visit(VariableExpr&) override;
+    void visit(SelfExpr&) override;
     void visit(BinaryExpr&) override;
     void visit(UnaryExpr&) override;
     void visit(AssignmentExpr&) override;

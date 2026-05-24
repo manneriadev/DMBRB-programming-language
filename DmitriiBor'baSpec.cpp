@@ -35,115 +35,33 @@
 
     --- Грамматика ---
 
-program:
-    item*
-
-item:
-    module | decl
-
-module:
-    'module' IDENTIFIER 'begin' (module | decl)* 'end'
-
-decl:
-    var_decl | function_decl | struct_decl
-
-var_decl:
-    'var' 'const'? IDENTIFIER (':' type)? ('=' expr)?
-
-function_decl:
-    'function' IDENTIFIER '(' pair_arg (',' pair_arg)* / () ')' ('::' type)? 'begin' block 'end'
-
-struct_decl:
-    'struct' IDENTIFIER 'begin' pair_arg* 'end'
-
-pair_arg:
-    IDENTIFIER ':' 'const'? type
-
-type:
-    primitive_type '?'?
-    | '[' type ';' expr? ']' '?'?
-    | 'struct' IDENTIFIER '?'?
-
-primitive_type:
-    'int8' | 'int16' | 'int32' | 'int64' | 'int'
-    | 'uint8' | 'uint16' | 'uint32' | 'uint64'
-    | 'float32' | 'float64' | 'float'
-    | 'bool' | 'char' | 'void'
-
-block:
-    (decl | stmt)*
-
-stmt:
-    if_stmt | when_stmt | while_stmt | for_stmt
-    | return_stmt | break_stmt | continue_stmt | expr_stmt
-
-if_stmt:
-    'if' expr 'begin' block ('else' 'begin' block)? 'end'
-
-when_stmt:
-    'when' (expr '->' 'begin' block 'end')* ('else' '->' 'begin' block 'end')? 'end'
-
-while_stmt:
-    'while' expr 'begin' block 'end'
-
-for_stmt:
-    'for' IDENTIFIER '=' expr ':' expr (':' expr)? 'begin' block 'end'
-
-return_stmt:
-    'return' expr?
-
-break_stmt:
-    'break'
-
-continue_stmt:
-    'continue'
-
-expr_stmt:
-    expr
-
-expr:
-    binary_expr (assign_op expr)?
-
-assign_op:
-    '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|='
-
-binary_expr:
-    unary_expr (binary_op unary_expr)*
-
-binary_op:
-    '||' | '&&'
-    | '|' | '^' | '&'
-    | '==' | '!='
-    | '<' | '>' | '<=' | '>='
-    | '<<' | '>>'
-    | '+' | '-'
-    | '*' | '/' | '%' | '//'
-    | '**'
-
-ternary_expr:
-    expr '?' expr ':' expr
-
-unary_expr:
-    ('-' | '!' | '~') unary_expr | postfix_expr
-
-postfix_expr:
-    primary_expr postfix*
-
-postfix:
-    '.' IDENTIFIER
-    | '[' expr ']'
-    | '(' (expr (',' expr)*)? ')'
-    | '::' type
-
-primary_expr:
-    INT_LITERAL
-    | FLOAT_LITERAL
-    | STRING_LITERAL
-    | CHAR_LITERAL
-    | 'true' | 'false' | 'none'
-    | IDENTIFIER
-    | '(' expr ')'
-    | '[' (expr (',' expr)*)? ']'
+program: (module | decl)*
+module: 'module' IDENTIFIER 'begin' (module | decl)* 'end'
+decl: var_decl | function_decl | struct_decl
+var_decl: 'var' 'const'? IDENTIFIER (':' type)?|('=' expr)?
+function_decl: 'function' IDENTIFIER '(' pair_arg (',' pair_arg)* / () ')'  '::' type 'begin' block 'end'
+struct_decl: 'struct' IDENTIFIER 'begin' pair_arg* 'end'
+pair_arg: IDENTIFIER ':' 'const'? type
+type: primitive_type '?'? | '[' type ';' expr? ']' '?'? | 'struct' IDENTIFIER '?'?
+primitive_type: 'int8' | 'int16' | 'int32' | 'int64' | 'int' | 'uint8' | 'uint16' | 'uint32' | 'uint64' | 'float32' | 'float64' | 'float' | 'bool' | 'char' | 'void'
+block: (decl | stmt)*
+stmt: if_stmt | when_stmt | while_stmt | for_stmt | return_stmt | break_stmt | continue_stmt | expr_stmt
+if_stmt: 'if' expr 'begin' block ('else' 'begin' block)? 'end'
+when_stmt: 'when' (expr '->' 'begin' block 'end')* ('else' '->' 'begin' block 'end')? 'end'
+while_stmt: 'while' expr 'begin' block 'end'
+for_stmt: 'for' IDENTIFIER '=' expr ':' expr (':' expr)? 'begin' block 'end'
+return_stmt: 'return' expr?
+break_stmt: 'break'
+continue_stmt: 'continue'
+expr_stmt: expr
+expr: binary_expr
+binary_expr: unary_expr (('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=') | ternary_expr | binary_op binary_expr)*
+binary_op: '||' | '&&' | '|' | '^' | '&' | '==' | '!=' | '<' | '>' | '<=' | '>=' | '<<' | '>>' | '+' | '-' | '*' | '/' | '%' | '//' | '**'
+ternary_expr: expr '?' expr ':' expr
+unary_expr: ('+' | '-' | '!' | '~') unary_expr | postfix_expr
+postfix_expr: primary_expr postfix*
+postfix: '.' IDENTIFIER | '[' expr ']' | '(' (expr (',' expr)*)? ')' | '::' type
+primary_expr: INT_LITERAL | FLOAT_LITERAL | STRING_LITERAL | CHAR_LITERAL | 'true' | 'false' | 'none' | IDENTIFIER | '(' expr ')' | '[' (expr (';' expr)*)? ']'
 
     --- Синтаксис ---
 

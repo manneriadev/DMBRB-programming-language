@@ -23,12 +23,13 @@ static std::unordered_map<std::string, TokenType> keywords = {
     {"const", TokenType::CONST},
     {"module", TokenType::MODULE},
     {"none", TokenType::NONE},
+    {"self", TokenType::SELF},
 
     {"int8", TokenType::INT8},
     {"int16", TokenType::INT16},
     {"int32", TokenType::INT32},
     {"int64", TokenType::INT64},
-    {"int", TokenType::INT32},
+    {"int", TokenType::INT64},
 
     {"uint8", TokenType::UINT8},
     {"uint16", TokenType::UINT16},
@@ -37,7 +38,7 @@ static std::unordered_map<std::string, TokenType> keywords = {
 
     {"float32", TokenType::FLOAT32},
     {"float64", TokenType::FLOAT64},
-    {"float", TokenType::FLOAT32},
+    {"float", TokenType::FLOAT64},
 
     {"bool", TokenType::BOOL},
     {"char", TokenType::CHAR},
@@ -101,13 +102,41 @@ std::vector<Token> Lexer::Tokenize()
     std::vector<Token> tokens;
     while(true)
     {
-        skip_space();
+        while(!is_eof() && (peek() == ' ' || peek() == '\t' || peek() == '\r'))
+            push_index(1);
+
         if(is_eof()) break;
+
+        if(peek() == '\n')  // add this for all expr to help divide pointer and expr
+        {
+            line++;
+            column = 1;
+            push_index(1);
+
+            if(!tokens.empty())
+            {
+                TokenType last = tokens.back().type;
+                if(last == TokenType::IDENTIFIER  ||
+                   last == TokenType::INT_LITERAL  ||
+                   last == TokenType::FLOAT_LITERAL||
+                   last == TokenType::STRING_LITERAL||
+                   last == TokenType::CHAR_LITERAL ||
+                   last == TokenType::TRUE         ||
+                   last == TokenType::FALSE        ||
+                   last == TokenType::NONE         ||
+                   last == TokenType::RPAREN       ||
+                   last == TokenType::RSQUAREPAREN)
+                {
+                    tokens.push_back({TokenType::NEWLINE, "\\n", line, column});
+                }
+            }
+            continue;
+        }
 
         if(peek() == '#')
         {
             push_index(1);
-            skip_comment();
+            while(!is_eof() && peek() != '\n') push_index(1);
             continue;
         }
 
