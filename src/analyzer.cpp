@@ -114,6 +114,8 @@ bool analyzer::declare_struct(StructDecl& node)
     AnyStruct st;
     st.name = node.name;
 
+    std::string full_name = current_module_prefix.empty() ? node.name : current_module_prefix + "__" + node.name;
+
     for(const auto& f : node.fields)
     {
         StructField field;
@@ -123,15 +125,24 @@ bool analyzer::declare_struct(StructDecl& node)
 
         st.fields.push_back(field);
     }
+    current[full_name] = st;
 
-    current[node.name] = st;
+    for(auto& method : node.decls)
+    {
+        std::string mangled = full_name + "__" + method->name;
+        AnyFunction func;
+        func.name = mangled;
+        func.return_type = method->return_type;
+        for(auto& a : method->args) func.args.push_back(a.type.type);
+        visions.back().functions[mangled] = func;
+    }
 
     auto prev_self = current_self_type;
     bool prev_inside = inside_method;
 
     current_self_type.base = InnerType::STRUCT;
     inside_method = true;
-    current_self_type.struct_name = node.name;
+    current_self_type.struct_name = full_name;
 
     for(auto& method: node.decls) method->accept(*this);
 
@@ -704,38 +715,69 @@ void analyzer::visit(MemberAccessExpr& node)
 
 void analyzer::visit(MethodCallExpr& node)
 {
-    AnyModule* mod = resolve_module_chain(node.object.get());
-    if(!mod)
+    AnyModule* mod = resolve_module_chain(node.object.get()); // module name
+    if(mod)
+    {
+        auto it = mod->functions.find(node.method);
+        if(it == mod->functions.end())
+        {
+            error("unknown function in module: " + node.method, &node);
+            return;
+        }
+        AnyFunction& func = it->second;
+        if(func.args.size() != node.args.size())
+        {
+            error("argument count mismatch: " + node.method, &node);
+            return;
+        }
+        for(size_t i = 0; i < node.args.size(); i++)
+        {
+            Type arg_t = visit_expr(*node.args[i]);
+            if(!can_convert(arg_t, func.args[i]))
+            {
+                error("argument type mismatch: " + node.method, &node);
+                return;
+            }
+        }
+        current_expr_type = func.return_type;
+        return;
+    }
+
+    // struct method
+    Type obj_type = visit_expr(*node.object);
+    if(obj_type.base != InnerType::STRUCT || obj_type.struct_name.empty())
     {
         error("cannot resolve method call target", &node);
         return;
     }
 
-    auto it = mod->functions.find(node.method);
-    if(it == mod->functions.end())
+    std::string mangled = obj_type.struct_name + "__" + node.method;
+    AnyFunction* func = resolve_function(mangled);
+    if(!func)
     {
-        error("unknown function in module: " + node.method, &node);
+        error("unknown method '" + node.method + "' on struct " + obj_type.struct_name, &node);
         return;
     }
 
-    AnyFunction& func = it->second;
-    if(func.args.size() != node.args.size())
+    if(func->args.size() != node.args.size())
     {
-        error("argument count mismatch: " + node.method, &node);
+        error("argument count mismatch in method: " + node.method, &node);
         return;
     }
 
     for(size_t i = 0; i < node.args.size(); i++)
     {
         Type arg_t = visit_expr(*node.args[i]);
-        if(!can_convert(arg_t, func.args[i]))
+        if(!can_convert(arg_t, func->args[i]))
         {
-            error("argument type mismatch: " + node.method, &node);
+            error("argument type mismatch in method: " + node.method, &node);
             return;
         }
     }
 
-    current_expr_type = func.return_type;
+    node.is_struct_method = true;
+    node.struct_name = obj_type.struct_name;  // full name
+    current_expr_type = func->return_type;
 }
 
 void analyzer::visit(IndexExpr& node)
@@ -1046,9 +1088,14 @@ void analyzer::visit(Module& node)
 
     global_modules[node.name] = mod;
 
+    std::string prev_prefix = current_module_prefix;
+    current_module_prefix = node.name;
+
     push_new_vision();
     for(auto& decl : node.decls) decl->accept(*this);
     pop_last_vision();
+
+    current_module_prefix = prev_prefix;
 }
 
 void analyzer::visit(Program& node)

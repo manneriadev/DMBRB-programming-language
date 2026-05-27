@@ -121,7 +121,7 @@ struct AddrOfExpr : Expr{ // &expr
 };
 
 struct LiteralExpr : Expr{
-    std::variant<int64_t, double, bool, std::string, char> value;
+    std::variant<uint64_t, int64_t, double, bool, std::string, char> value;
     void accept(Visitor& v) override;
 };
 
@@ -169,6 +169,8 @@ struct MemberAccessExpr : Expr{
 struct MethodCallExpr : Expr{
     std::unique_ptr<Expr> object;
     std::string method;
+    bool is_struct_method = false;
+    std::string struct_name; // full name
     std::vector<std::unique_ptr<Expr>> args;
     void accept(Visitor& v) override;
 };

@@ -59,6 +59,7 @@ private:
     Type current_expr_type;
     Type current_self_type;
     FunctionDecl* current_function = nullptr;
+    std::string current_module_prefix; // for mem access
     
     bool inside_loop = false;
     bool inside_method = false;

@@ -2,6 +2,7 @@
 #include "parser.hpp"
 #include "ASTPrinter.hpp"
 #include "analyzer.hpp"
+#include "codegen.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -58,12 +59,22 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        ASTPrinter printer;
         analyzer sem;
         sem.analyze(*program);
         if(sem.get_status() == true) return 1;
-        std::cout << "\nAST\n\n";
-        printer.print(*program);
+
+        std::ofstream out("out.c");
+
+        if(!out.is_open())
+        {
+            std::cerr << "failed to create out.c\n";
+            return 1;
+        }
+
+        Codegen cg(out);
+        cg.generate(*program);
+
+        std::cout << "\nC code generated -> out.c\n";
     }
     catch(const std::exception& ex)
     {
