@@ -616,6 +616,11 @@ bool Parser::try_parse_type(Type& out)
         {
             dim.size_expr = parse_expression();
             if(failed) return false;
+        
+            if(auto* lit = dynamic_cast<LiteralExpr*>(dim.size_expr.get()))
+            {
+                if(std::holds_alternative<int64_t>(lit->value)) dim.size_val = std::get<int64_t>(lit->value);
+            }
         }
 
         if(!eat(TokenType::RSQUAREPAREN))
@@ -626,6 +631,7 @@ bool Parser::try_parse_type(Type& out)
 
         out = elem_type;
         out.arrays.push_back(std::move(dim));
+        out.is_array = true;
 
         if(eat(TokenType::QUESTION)) out.is_optional = true;
         return true;

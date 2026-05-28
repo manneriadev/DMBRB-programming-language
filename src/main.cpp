@@ -49,8 +49,7 @@ int main(int argc, char** argv)
 
         Lexer lexer(source);
         auto tokens = lexer.Tokenize();
-        dump_tokens(tokens);
-
+ 
         Parser parser(tokens);
         auto program = parser.parse();
         if(!program)

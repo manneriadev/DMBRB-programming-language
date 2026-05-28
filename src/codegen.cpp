@@ -31,6 +31,18 @@ std::string Codegen::mangle(const std::string& module, const std::string& name)
     return module + "__" + name;
 }
 
+std::string Codegen::decl_to_c(const Type& t, const std::string& name)
+{
+    if(t.is_array && !t.arrays.empty())
+    {
+        Type elem = t;
+        elem.is_array = false;
+        elem.arrays.clear();
+        return type_to_c(elem) + " " + name + "[" + std::to_string(t.arrays[0].size_val) + "]";
+    }
+    return type_to_c(t) + " " + name;
+}
+
 std::string Codegen::type_to_c(const Type& t)
 {
     std::string base;
@@ -175,6 +187,8 @@ void Codegen::visit(AssignmentExpr& node)
         case assign_type::AMPEQ: op = "&="; break;
         case assign_type::PIPEEQ: op = "|="; break;
     }
+    if(dynamic_cast<EmptyExpr*>(node.value.get())) return;
+
     node.target->accept(*this);
     out << " " << op << " ";
     node.value->accept(*this);
@@ -184,7 +198,7 @@ void Codegen::visit(CallExpr& node) // builtins
 {
     if(node.name == "print")
     {
-        out << "printf(\"%ld\\n\", (int64_t)(";
+        out << "printf(\"%lld\\n\", (int64_t)(";
         if(!node.args.empty()) node.args[0]->accept(*this);
         out << "))";
         return;
@@ -343,7 +357,7 @@ void Codegen::visit(WhenStmt& node) // chain of if else (чем гуще лес 
     bool first = true;
     for(auto& [cond, body] : node.cases)
     {
-        for(int i = 0; i < indent; ++i) out << "    ";
+        if(!first) for(int i = 0; i < indent; ++i) out << "    ";
         if(first) { out << "if ("; first = false; }
         else out << "else if (";
         cond->accept(*this);
@@ -421,13 +435,20 @@ void Codegen::visit(ContinueStmt&) { out << "continue;\n"; }
 
 void Codegen::visit(VarDecl& node)
 {
-    std::string ctype = type_to_c(node.type.type);
     if(node.type.is_const) out << "const ";
-    out << ctype << " " << node.name;
+    out << decl_to_c(node.type.type, node.name);
     if(node.init)
     {
-        out << " = ";
-        node.init->accept(*this);
+        if(dynamic_cast<EmptyExpr*>(node.init.get()))
+        {
+            if(node.type.type.is_pointer)
+                out << " = NULL";
+        }
+        else
+        {
+            out << " = ";
+            node.init->accept(*this);
+        }
     }
 }
 
@@ -440,7 +461,7 @@ void Codegen::visit(FunctionDecl& node)
     for(size_t i = 0; i < node.args.size(); ++i)
     {
         if(i > 0) out << ", ";
-        out << type_to_c(node.args[i].type.type) << " " << node.args[i].name;
+        out << decl_to_c(node.args[i].type.type, node.args[i].name);
     }
     out << ") {\n";
     begin_indent();
@@ -455,7 +476,7 @@ void Codegen::visit(StructDecl& node)
     out << "typedef struct {\n";
     for(auto& f : node.fields)
     {
-        out << "    " << type_to_c(f.type.type) << " " << f.name << ";\n";
+        out << "    " << decl_to_c(f.type.type, f.name) << ";\n";
     }
     out << "} " << sname << ";\n\n";
 
@@ -465,7 +486,7 @@ void Codegen::visit(StructDecl& node)
     {
         out << type_to_c(method->return_type) << " ";
         out << sname << "__" << method->name << "(" << sname << "* self";
-        for(auto& a : method->args) out << ", " << type_to_c(a.type.type) << " " << a.name;
+        for(auto& a : method->args) out << ", " << decl_to_c(a.type.type, a.name);
         out << ") {\n";
         begin_indent();
         if(method->body) method->body->accept(*this);
@@ -487,8 +508,12 @@ void Codegen::visit(Module& node)
         current_module = node.name;
     }
 
-    for(auto& decl : node.decls) decl->accept(*this);
-
+    for(auto& decl : node.decls) 
+    {
+        decl->accept(*this);
+        if(dynamic_cast<VarDecl*>(decl.get())) out << ";\n";
+    }
+    
     current_module = prev;
 }
 
@@ -496,16 +521,11 @@ void Codegen::visit(Program& node)
 {
     for(auto& item : node.items)
     {
+        for(int i = 0; i < indent; ++i) out << "    ";
         item->accept(*this);
-
-        if(dynamic_cast<VarDecl*>(item.get()) ||
-           dynamic_cast<ExprStmt*>(item.get()))
+        if(dynamic_cast<VarDecl*>(item.get()) || dynamic_cast<ExprStmt*>(item.get()))
         {
             out << ";\n";
-        }
-        else
-        {
-            out << "\n";
         }
     }
 }

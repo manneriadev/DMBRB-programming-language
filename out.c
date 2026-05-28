@@ -46,7 +46,10 @@ int32_t math__abs_val(int32_t x) {
 
 }
 
-int32_t x = 10int32_t y = 20int32_t* global_ptr = NULLvoid swap(int32_t* a, int32_t* b) {
+int32_t x = 10;
+int32_t y = 20;
+int32_t* global_ptr = NULL;
+void swap(int32_t* a, int32_t* b) {
     int32_t tmp = (*a);
     (*a) = (*b);
     (*b) = tmp;
@@ -54,7 +57,7 @@ int32_t x = 10int32_t y = 20int32_t* global_ptr = NULLvoid swap(int32_t* a, int3
 
 }
 
-int32_t sum_array(int32_t arr, int32_t n) {
+int32_t sum_array(int32_t arr[5], int32_t n) {
     int32_t result = 0;
     int32_t i = 0;
     while ((i < n)) {
@@ -76,7 +79,7 @@ int32_t main() {
     } else {
         int32_t r = math__sum(0, 1);
     }
-        if ((e == 0)) {
+    if ((e == 0)) {
         int32_t z = 0;
     }
     else if ((e == 10)) {
@@ -114,9 +117,9 @@ int32_t main() {
     int32_t fi = ((int32_t)(f));
     int32_t ix = 42;
     double fx = ((double)(ix));
-    int32_t opt = NULL;
+    int32_t opt;
     opt = 42;
-    opt = NULL;
+    ;
     int32_t px = 100;
     int32_t* ptr = (&px);
     int32_t deref_val = (*ptr);

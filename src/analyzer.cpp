@@ -646,6 +646,35 @@ void analyzer::visit(AssignmentExpr& node)
 
 void analyzer::visit(CallExpr& node)
 {
+    if(node.name == "print")
+    {
+        if(node.args.size() != 1)
+        {
+            error("print expects 1 argument", &node);
+            return;
+        }
+        visit_expr(*node.args[0]);
+        current_expr_type = Type{InnerType::VOID};
+        return;
+    }
+
+    if(node.name == "exit")
+    {
+        if(node.args.size() != 1)
+        {
+            error("exit expects 1 argument", &node);
+            return;
+        }
+        Type t = visit_expr(*node.args[0]);
+        if(!is_integer(t))
+        {
+            error("exit expects integer argument", &node);
+            return;
+        }
+        current_expr_type = Type{InnerType::VOID};
+        return;
+    }
+
     auto func = resolve_function(node.name);
 
     if(!func)

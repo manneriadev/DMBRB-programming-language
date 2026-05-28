@@ -29,6 +29,7 @@ enum class InnerType{
 struct ArrayDim{
     bool is_dynamic = false;
     std::unique_ptr<Expr> size_expr;
+    int64_t size_val = 0;
 
     ArrayDim() = default;
 
@@ -38,15 +39,16 @@ struct ArrayDim{
     ArrayDim(const ArrayDim& other)
     {
         is_dynamic = other.is_dynamic;
-        if (other.size_expr)size_expr = nullptr;
+        size_val = other.size_val;
+        size_expr = nullptr;
     }
 
-    ArrayDim& operator=(const ArrayDim& other){
-        if (this == &other) return *this;
-
+    ArrayDim& operator=(const ArrayDim& other)
+    {
+        if(this == &other) return *this;
         is_dynamic = other.is_dynamic;
+        size_val = other.size_val;
         size_expr = nullptr;
-
         return *this;
     }
 };
@@ -370,4 +372,4 @@ inline void VarDecl::accept(Visitor& v) { v.visit(*this); }
 inline void FunctionDecl::accept(Visitor& v) { v.visit(*this); }
 inline void StructDecl::accept(Visitor& v) { v.visit(*this); }
 inline void Module::accept(Visitor& v) { v.visit(*this); }
-inline void Program::accept(Visitor& v) { for (auto& item : items) item->accept(v); }
+inline void Program::accept(Visitor& v) { v.visit(*this); }

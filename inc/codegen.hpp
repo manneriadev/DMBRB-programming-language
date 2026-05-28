@@ -19,6 +19,7 @@ private:
     void writeln(const std::string& s);
     void begin_indent();
     void end_indent();
+    std::string decl_to_c(const Type& t, const std::string& name);
     std::string type_to_c(const Type& t);
     std::string mangle(const std::string& module, const std::string& name);
 
