@@ -3,166 +3,196 @@
 #include <stdlib.h>
 #include <math.h>
 
-typedef struct {
-    int32_t x;
-    int32_t y;
-} math__Point;
-
-void math__Point__translate(math__Point* self, int32_t dx, int32_t dy) {
-    self->x = (self->x + dx);
-    self->y = (self->y + dy);
-    return;
+int32_t pool[300];
+int32_t pool_size = 0;
+int32_t nval(int32_t i) {
+    return pool[(i * 3)];
 
 }
 
-int32_t math__Point__get_x(math__Point* self) {
-    return self->x;
+int32_t nleft(int32_t i) {
+    return pool[((i * 3) + 1)];
 
 }
 
-int32_t math__sum(int32_t a, int32_t b) {
-    return (a + b);
+int32_t nright(int32_t i) {
+    return pool[((i * 3) + 2)];
 
 }
 
-int32_t math__fact(int32_t n) {
-    int32_t result = 1;
-    int32_t i = 1;
-    while ((i <= n)) {
-        result = (result * i);
-        i = (i + 1);
+void set_val(int32_t i, int32_t v) {
+    pool[(i * 3)] = v;
+}
+
+void set_left(int32_t i, int32_t v) {
+    pool[((i * 3) + 1)] = v;
+}
+
+void set_right(int32_t i, int32_t v) {
+    pool[((i * 3) + 2)] = v;
+}
+
+int32_t new_node(int32_t v) {
+    int32_t idx = pool_size;
+    set_val(idx, v);
+    set_left(idx, (-1));
+    set_right(idx, (-1));
+    pool_size = (pool_size + 1);
+    return idx;
+
+}
+
+int32_t insert(int32_t root, int32_t v) {
+    if ((root == (-1))) {
+        return new_node(v);
+
     }
-    return result;
+    if ((v < nval(root))) {
+        set_left(root, insert(nleft(root), v));
+    }
+    if ((v > nval(root))) {
+        set_right(root, insert(nright(root), v));
+    }
+    return root;
 
 }
 
-int32_t math__max(int32_t a, int32_t b) {
-    return ((a > b) ? a : b);
+int32_t search(int32_t root, int32_t v) {
+    if ((root == (-1))) {
+        return 0;
+
+    }
+    if ((v == nval(root))) {
+        return 1;
+
+    }
+    if ((v < nval(root))) {
+        return search(nleft(root), v);
+
+    }
+    return search(nright(root), v);
 
 }
 
-int32_t math__abs_val(int32_t x) {
-    return ((x < 0) ? (-x) : x);
+int32_t find_min(int32_t root) {
+    int32_t cur = root;
+    while ((nleft(cur) != (-1))) {
+        cur = nleft(cur);
+    }
+    return cur;
 
 }
 
-int32_t x = 10;
-int32_t y = 20;
-int32_t* global_ptr = NULL;
-void swap(int32_t* a, int32_t* b) {
-    int32_t tmp = (*a);
-    (*a) = (*b);
-    (*b) = tmp;
-    return;
+int32_t delete(int32_t root, int32_t v) {
+    if ((root == (-1))) {
+        return (-1);
+
+    }
+    if ((v < nval(root))) {
+        set_left(root, delete(nleft(root), v));
+        return root;
+
+    }
+    if ((v > nval(root))) {
+        set_right(root, delete(nright(root), v));
+        return root;
+
+    }
+    if ((nleft(root) == (-1))) {
+        return nright(root);
+
+    }
+    if ((nright(root) == (-1))) {
+        return nleft(root);
+
+    }
+    int32_t m = find_min(nright(root));
+    set_val(root, nval(m));
+    set_right(root, delete(nright(root), nval(m)));
+    return root;
 
 }
 
-int32_t sum_array(int32_t arr[5], int32_t n) {
-    int32_t result = 0;
+void inorder(int32_t root) {
+    if ((root == (-1))) {
+        return;
+
+    }
+    inorder(nleft(root));
+    printf("%d ", nval(root));
+    inorder(nright(root));
+}
+
+int32_t height(int32_t root) {
+    if ((root == (-1))) {
+        return 0;
+
+    }
+    int32_t lh = height(nleft(root));
+    int32_t rh = height(nright(root));
+    int32_t h = ((lh > rh) ? lh : rh);
+    return (h + 1);
+
+}
+
+void visual_print_tree(int32_t root, int32_t space, int32_t value) {
+    if ((root == (-1))) {
+        return;
+
+    }
+    if ((nright(root) != (-1))) {
+        visual_print_tree(nright(root), (space + 5), 2);
+    }
     int32_t i = 0;
-    while ((i < n)) {
-        result = (result + arr[i]);
+    while ((i < space)) {
+        printf(" ");
         i = (i + 1);
     }
-    return result;
-
+    if ((value == 2)) {
+        printf("/---%d\r\n", nval(root));
+    }
+    if ((value == 1)) {
+        printf("\\---%d\r\n", nval(root));
+    }
+    if ((value == 0)) {
+        printf("%d\r\n", nval(root));
+    }
+    if ((nleft(root) != (-1))) {
+        visual_print_tree(nleft(root), (space + 5), 1);
+    }
 }
 
 int32_t main() {
-    int32_t a = 10;
-    int32_t b = 20;
-    int32_t c = math__sum(a, b);
-    int32_t d = math__fact(5);
-    int64_t e = (((a + b) * c) - d);
-    if ((e > 0)) {
-        int32_t r = math__sum(e, 1);
-    } else {
-        int32_t r = math__sum(0, 1);
-    }
-    if ((e == 0)) {
-        int32_t z = 0;
-    }
-    else if ((e == 10)) {
-        int32_t z = 10;
-    }
-    else {
-        int32_t z = 99;
-    }
-    int32_t i = 0;
-    for (int64_t i = 0; i < 10; i++) {
-        if ((i == 5)) {
-            break;
-
-        }
-        int32_t t = math__sum(i, 1);
-    }
-    while ((a > 0)) {
-        a = (a - 1);
-        if ((a == 5)) {
-            continue;
-
-        }
-    }
-    int32_t m = math__max(c, d);
-    int flag = ((m > 0) ? 1 : 0);
-    int32_t bits = 0;
-    int32_t mask = 15;
-    bits = (bits | mask);
-    bits = (bits & 7);
-    bits = (bits ^ 3);
-    bits = (bits << 1);
-    bits = (bits >> 1);
-    bits = (~bits);
-    double f = 3.14;
-    int32_t fi = ((int32_t)(f));
-    int32_t ix = 42;
-    double fx = ((double)(ix));
-    int32_t opt;
-    opt = 42;
-    ;
-    int32_t px = 100;
-    int32_t* ptr = (&px);
-    int32_t deref_val = (*ptr);
-    (*ptr) = 200;
-    int32_t* null_ptr = NULL;
-    int32_t arr_val = 5;
-    int32_t* arr_ptr = (&arr_val);
-    int32_t shifted = (*(arr_ptr + 0));
-    int32_t p = 3;
-    int32_t q = 7;
-    swap((&p), (&q));
-    global_ptr = (&px);
-    int32_t from_global = (*global_ptr);
-    if ((c > 0)) {
-        if ((d > 0)) {
-            int32_t nested = math__sum(c, d);
-        } else {
-            int32_t nested = 0;
-        }
-    } else {
-        int32_t nested = (-1);
-    }
-    int32_t outer = 3;
-    while ((outer > 0)) {
-        int32_t inner = 3;
-        while ((inner > 0)) {
-            inner = (inner - 1);
-        }
-        outer = (outer - 1);
-    }
-    for (int64_t i = 0; i < 20; i += 2) {
-        int32_t stepped = math__sum(i, 0);
-    }
-    int32_t neg = (-5);
-    int32_t abs_result = math__abs_val(neg);
-    int32_t max_result = math__max(abs_result, d);
-    int32_t comp = 10;
-    comp += 5;
-    comp -= 3;
-    comp *= 2;
-    comp /= 4;
-    comp %= 3;
-    const double PI = 3.14159;
+    int32_t root = (-1);
+    root = insert(root, 50);
+    root = insert(root, 30);
+    root = insert(root, 70);
+    root = insert(root, 20);
+    root = insert(root, 40);
+    root = insert(root, 60);
+    root = insert(root, 80);
+    root = insert(root, 10);
+    root = insert(root, 35);
+    printf("inorder:  ");
+    inorder(root);
+    printf("\r\n");
+    printf("height:   %d\r\n", height(root));
+    printf("search 40: %d\r\n", search(root, 40));
+    printf("search 99: %d\r\n", search(root, 99));
+    printf("\r\n");
+    visual_print_tree(root, 0, 0);
+    printf("\r\n");
+    root = delete(root, 30);
+    printf("after delete 30:\r\n");
+    visual_print_tree(root, 0, 0);
+    printf("\r\n");
+    root = delete(root, 80);
+    printf("after delete 80:\r\n");
+    visual_print_tree(root, 0, 0);
+    printf("\r\n");
+    root = delete(root, 50);
+    printf("after delete 50:\r\n");
+    visual_print_tree(root, 0, 0);
     return 0;
 
 }

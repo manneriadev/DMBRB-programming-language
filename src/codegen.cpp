@@ -194,15 +194,20 @@ void Codegen::visit(AssignmentExpr& node)
     node.value->accept(*this);
 }
 
-void Codegen::visit(CallExpr& node) // builtins
+void Codegen::visit(CallExpr& node)
 {
-    if(node.name == "print")
+    if(node.name == "print") // builtins
     {
-        out << "printf(\"%lld\\n\", (int64_t)(";
-        if(!node.args.empty()) node.args[0]->accept(*this);
-        out << "))";
+        out << "printf(";
+        for(size_t i = 0; i < node.args.size(); ++i)
+        {
+            if(i > 0) out << ", ";
+            node.args[i]->accept(*this);
+        }
+        out << ")";
         return;
     }
+    
     if(node.name == "exit")
     {
         out << "exit(";

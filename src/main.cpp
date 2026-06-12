@@ -32,14 +32,14 @@ int main(int argc, char** argv)
 {
     if(argc < 2)
     {
-        std::cerr << "usage: ./my_lang <file.txt>\n";
+        std::cerr << "usage: ./my_lang <file.dmb>\n";
         return 1;
     }
 
     std::string filepath = argv[1];
-    if(filepath.size() < 4 || filepath.substr(filepath.size() - 4) != ".txt")
+    if(filepath.size() < 4 || filepath.substr(filepath.size() - 4) != ".dmb")
     {
-        std::cerr << "error: file must have .txt extension\n";
+        std::cerr << "error: file must have .dmb extension\n";
         return 1;
     }
 
@@ -73,7 +73,16 @@ int main(int argc, char** argv)
         Codegen cg(out);
         cg.generate(*program);
 
-        std::cout << "\nC code generated -> out.c\n";
+        out.close();
+
+        std::string binary = filepath.substr(0, filepath.size() - 4);
+        std::string cmd = "gcc out.c -o " + binary + ".exe" + " -lm";
+        int ret = std::system(cmd.c_str());
+        if(ret != 0)
+        {
+            std::cerr << "compilation failed\n";
+            return 1;
+        }
     }
     catch(const std::exception& ex)
     {

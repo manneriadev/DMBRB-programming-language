@@ -1,0 +1,210 @@
+var rng_state: int32 = 12345
+
+function rand_next()::int32
+begin
+    rng_state = rng_state ^ (rng_state << 13)
+    rng_state = rng_state ^ (rng_state >> 17)
+    rng_state = rng_state ^ (rng_state << 5)
+    return rng_state
+end
+
+function rand_seed(seed: int32)::void
+begin
+    rng_state = seed
+end
+
+function rand_range(lo: int32, hi: int32)::int32
+begin
+    var r = rand_next()
+    if r < 0
+    begin
+        r = r ^ (r >> 31)
+    end
+    return r % (hi - lo) + lo
+end
+
+var W: int32 = 20
+var H: int32 = 20
+var grid: [int32; 400]
+var sx: [int32; 400]
+var sy: [int32; 400]
+var slen: int32 = 0
+var dx: int32 = 1
+var dy: int32 = 0
+var alive: int32 = 1
+var score: int32 = 0
+
+function idx(x: int32, y: int32)::int32
+begin
+    return y * 20 + x
+end
+
+function place_food()::void
+begin
+    var fx = rand_range(1, 19)
+    var fy = rand_range(1, 19)
+    grid[idx(fx, fy)] = 2
+end
+
+function init()::void
+begin
+    for i = 0:400
+    begin
+        grid[i] = 0
+    end
+    sx[0] = 5
+    sy[0] = 5
+    slen = 1
+    grid[idx(5, 5)] = 1
+    place_food()
+end
+
+function draw()::void
+begin
+    print("\033[2J\033[H")
+    var y: int32 = 0
+    while y < H
+    begin
+        var x: int32 = 0
+        while x < W
+        begin
+            var c = grid[idx(x, y)]
+            if c == 1
+            begin
+                print("%c", 79)
+            end
+            if c == 2
+            begin
+                print("%c", 64)
+            end
+            if c == 0
+            begin
+                print("%c", 46)
+            end
+            x = x + 1
+        end
+        print("\r\n")
+        y = y + 1
+    end
+    print("score: %d\r\n", score)
+end
+
+function handle_input(ch: int32)::void
+begin
+    if ch == 119
+    begin
+        if dy == 0
+        begin
+            dx = 0
+            dy = -1
+        end
+    end
+    if ch == 115
+    begin
+        if dy == 0
+        begin
+            dx = 0
+            dy = 1
+        end
+    end
+    if ch == 97
+    begin
+        if dx == 0
+        begin
+            dx = -1
+            dy = 0
+        end
+    end
+    if ch == 100
+    begin
+        if dx == 0
+        begin
+            dx = 1
+            dy = 0
+        end
+    end
+    if ch == 113
+    begin
+        alive = 0
+    end
+end
+
+function step()::void
+begin
+    var nx = sx[0] + dx
+    var ny = sy[0] + dy
+    if nx < 0
+    begin
+        alive = 0
+        return
+    end
+    if nx >= W
+    begin
+        alive = 0
+        return
+    end
+    if ny < 0
+    begin
+        alive = 0
+        return
+    end
+    if ny >= H
+    begin
+        alive = 0
+        return
+    end
+    var hit = grid[idx(nx, ny)]
+    if hit == 1
+    begin
+        alive = 0
+        return
+    end
+    if hit == 2
+    begin
+        score = score + 1
+        var i: int32 = slen
+        while i > 0
+        begin
+            sx[i] = sx[i - 1]
+            sy[i] = sy[i - 1]
+            i = i - 1
+        end
+        slen = slen + 1
+        sx[0] = nx
+        sy[0] = ny
+        grid[idx(nx, ny)] = 1
+        place_food()
+        return
+    end
+    var tail_x = sx[slen - 1]
+    var tail_y = sy[slen - 1]
+    grid[idx(tail_x, tail_y)] = 0
+    var i: int32 = slen - 1
+    while i > 0
+    begin
+        sx[i] = sx[i - 1]
+        sy[i] = sy[i - 1]
+        i = i - 1
+    end
+    sx[0] = nx
+    sy[0] = ny
+    grid[idx(nx, ny)] = 1
+end
+
+function main()::int32
+begin
+    system("stty raw -echo min 0 time 1")
+    rand_seed(12345)
+    init()
+    while alive == 1
+    begin
+        draw()
+        var ch = getchar()
+        handle_input(ch)
+        step()
+    end
+    system("stty cooked echo")
+    print("\033[2J\033[H")
+    print("game over! score: %d\n", score)
+    return 0
+end

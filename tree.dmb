@@ -1,0 +1,222 @@
+/*
+
+    У меня в языке нет малока, 
+    поэтому я заранее выделяю память
+    MAX_NODES = 100, каждый узел = 3 поля => 300 ячеек
+
+*/
+var pool: [int32; 300]
+var pool_size: int32 = 0
+
+function nval(i: int32)::int32
+begin
+    return pool[i * 3]
+end
+
+function nleft(i: int32)::int32
+begin
+    return pool[i * 3 + 1]
+end
+
+function nright(i: int32)::int32
+begin
+    return pool[i * 3 + 2]
+end
+
+function set_val(i: int32, v: int32)::void
+begin
+    pool[i * 3] = v
+end
+
+function set_left(i: int32, v: int32)::void
+begin
+    pool[i * 3 + 1] = v
+end
+
+function set_right(i: int32, v: int32)::void
+begin
+    pool[i * 3 + 2] = v
+end
+
+function new_node(v: int32)::int32
+begin
+    var idx = pool_size
+    set_val(idx, v)
+    set_left(idx, -1)
+    set_right(idx, -1)
+    pool_size = pool_size + 1
+    return idx
+end
+
+function insert(root: int32, v: int32)::int32
+begin
+    if root == -1
+    begin
+        return new_node(v)
+    end
+    if v < nval(root)
+    begin
+        set_left(root, insert(nleft(root), v))
+    end
+    if v > nval(root)
+    begin
+        set_right(root, insert(nright(root), v))
+    end
+    return root
+end
+
+function search(root: int32, v: int32)::int32
+begin
+    if root == -1
+    begin
+        return 0
+    end
+    if v == nval(root)
+    begin
+        return 1
+    end
+    if v < nval(root)
+    begin
+        return search(nleft(root), v)
+    end
+    return search(nright(root), v)
+end
+
+function find_min(root: int32)::int32
+begin
+    var cur = root
+    while nleft(cur) != -1
+    begin
+        cur = nleft(cur)
+    end
+    return cur
+end
+
+function delete(root: int32, v: int32)::int32
+begin
+    if root == -1
+    begin
+        return -1
+    end
+    if v < nval(root)
+    begin
+        set_left(root, delete(nleft(root), v))
+        return root
+    end
+    if v > nval(root)
+    begin
+        set_right(root, delete(nright(root), v))
+        return root
+    end
+    if nleft(root) == -1
+    begin
+        return nright(root)
+    end
+    if nright(root) == -1
+    begin
+        return nleft(root)
+    end
+    var m = find_min(nright(root))
+    set_val(root, nval(m))
+    set_right(root, delete(nright(root), nval(m)))
+    return root
+end
+
+function inorder(root: int32)::void
+begin
+    if root == -1
+    begin
+        return
+    end
+    inorder(nleft(root))
+    print("%d ", nval(root))
+    inorder(nright(root))
+end
+
+function height(root: int32)::int32
+begin
+    if root == -1
+    begin
+        return 0
+    end
+    var lh = height(nleft(root))
+    var rh = height(nright(root))
+    var h = lh > rh ? lh : rh
+    return h + 1
+end
+
+# value: 0 = корень, 1 = левый ребёнок (\---), 2 = правый ребёнок (/---)
+function visual_print_tree(root: int32, space: int32, value: int32)::void
+begin
+    if root == -1
+    begin
+        return
+    end
+    if nright(root) != -1
+    begin
+        visual_print_tree(nright(root), space + 5, 2)
+    end
+    var i: int32 = 0
+    while i < space
+    begin
+        print(" ")
+        i = i + 1
+    end
+    if value == 2
+    begin
+        print("/---%d\r\n", nval(root))
+    end
+    if value == 1
+    begin
+        print("\\---%d\r\n", nval(root))
+    end
+    if value == 0
+    begin
+        print("%d\r\n", nval(root))
+    end
+    if nleft(root) != -1
+    begin
+        visual_print_tree(nleft(root), space + 5, 1)
+    end
+end
+
+function main()::int32
+begin
+    var root: int32 = -1
+    root = insert(root, 50)
+    root = insert(root, 30)
+    root = insert(root, 70)
+    root = insert(root, 20)
+    root = insert(root, 40)
+    root = insert(root, 60)
+    root = insert(root, 80)
+    root = insert(root, 10)
+    root = insert(root, 35)
+
+    print("inorder:  ")
+    inorder(root)
+    print("\r\n")
+    print("height:   %d\r\n", height(root))
+    print("search 40: %d\r\n", search(root, 40))
+    print("search 99: %d\r\n", search(root, 99))
+    print("\r\n")
+
+    visual_print_tree(root, 0, 0)
+    print("\r\n")
+
+    root = delete(root, 30)
+    print("after delete 30:\r\n")
+    visual_print_tree(root, 0, 0)
+    print("\r\n")
+
+    root = delete(root, 80)
+    print("after delete 80:\r\n")
+    visual_print_tree(root, 0, 0)
+    print("\r\n")
+
+    root = delete(root, 50)
+    print("after delete 50:\r\n")
+    visual_print_tree(root, 0, 0)
+
+    return 0
+end

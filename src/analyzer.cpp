@@ -2,6 +2,7 @@
 #include "analyzer.hpp"
 
 #include <iostream>
+#include <cstdio>
 
 void analyzer::push_new_vision()
 {
@@ -648,12 +649,18 @@ void analyzer::visit(CallExpr& node)
 {
     if(node.name == "print")
     {
-        if(node.args.size() != 1)
+        if(node.args.empty())
         {
-            error("print expects 1 argument", &node);
+            error("print expects at least 1 argument", &node);
             return;
         }
-        visit_expr(*node.args[0]);
+        Type first = visit_expr(*node.args[0]);
+        if(!is_string(first))
+        {
+            error("print first argument must be a format string", &node);
+            return;
+        }
+        for(size_t i = 1; i < node.args.size(); ++i) visit_expr(*node.args[i]);
         current_expr_type = Type{InnerType::VOID};
         return;
     }
@@ -671,6 +678,29 @@ void analyzer::visit(CallExpr& node)
             error("exit expects integer argument", &node);
             return;
         }
+        current_expr_type = Type{InnerType::VOID};
+        return;
+    }
+
+     if(node.name == "getchar")
+    {
+        if(!node.args.empty())
+        { 
+            error("getchar takes no arguments", &node); 
+            return; 
+        }
+        current_expr_type = Type{InnerType::INT32};
+        return;
+    }
+
+    if(node.name == "system")
+    {
+        if(node.args.size() != 1) 
+        { 
+            error("system expects 1 argument", &node); 
+            return; 
+        }
+        visit_expr(*node.args[0]);
         current_expr_type = Type{InnerType::VOID};
         return;
     }

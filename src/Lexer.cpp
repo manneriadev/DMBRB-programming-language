@@ -140,6 +140,24 @@ std::vector<Token> Lexer::Tokenize()
             continue;
         }
 
+        if(peek() == '/' && peek_next() == '*')
+        {
+            push_index(2);
+            int depth = 1;
+            while(!is_eof() && depth > 0)
+            {
+                if(peek() == '/' && peek_next() == '*') { push_index(2); ++depth; }
+                else if(peek() == '*' && peek_next() == '/') { push_index(2); --depth; }
+                else
+                {
+                    if(peek() == '\n') { line++; column = 1; }
+                    push_index(1);
+                }
+            }
+            if(depth != 0) throw std::runtime_error("unclosed block comment at line " + std::to_string(line));
+            continue;
+        }
+
         Token token = next_token();
         if(token.type == TokenType::ERROR) throw std::runtime_error("unexpected character at line " + std::to_string(line) + " column " + std::to_string(column) + " -> '" + token.lexeme + "'");
 
