@@ -42,6 +42,8 @@ private:
     std::unique_ptr<VarDecl> parse_var_decl();
     std::unique_ptr<FunctionDecl> parse_function_decl();
     std::unique_ptr<StructDecl> parse_struct_decl();
+    std::unique_ptr<Decl> parse_import_decl();
+    std::unique_ptr<Decl> parse_export_decl();
 
     pair_arg parse_pair_arg();
     arg_type parse_arg_type();
@@ -61,6 +63,7 @@ private:
     std::unique_ptr<Expr> parse_expression();
     std::unique_ptr<Expr> parse_binary(int min_priority);
     std::unique_ptr<Expr> parse_unary();
+    std::unique_ptr<Expr> parse_postfix_tail(std::unique_ptr<Expr> expr);
     std::unique_ptr<Expr> parse_postfix();
     std::unique_ptr<Expr> parse_primary();
     std::unique_ptr<Expr> parse_group();

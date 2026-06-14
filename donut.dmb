@@ -1,0 +1,90 @@
+var A: float32 = 0.0
+var B: float32 = 0.0
+var z: [float32; 1760]
+var b: [char; 1760]
+
+function main()::int32
+begin
+    var i: float32 = 0.0
+    var j: float32 = 0.0
+    var k: int32 = 0
+
+    print("\x1b[2J")
+
+    while true
+    begin
+        memset(b, 32, 1760)
+        memset(z, 0, 7040)
+
+        j = 0.0
+        while j < 6.28
+        begin
+            i = 0.0
+            while i < 6.28
+            begin
+                var c_: float32 = sin(i)
+                var d_: float32 = cos(j)
+                var e_: float32 = sin(A)
+                var f_: float32 = sin(j)
+                var g_: float32 = cos(A)
+                var l_: float32 = cos(i)
+                var m_: float32 = cos(B)
+                var n_: float32 = sin(B)
+
+                var h: float32 = d_ + 2.0
+                var D: float32 = 1.0 / (c_ * h * e_ + f_ * g_ + 5.0)
+                var t: float32 = c_ * h * g_ - f_ * e_
+
+                var x: int32 = (40.0 + 30.0 * D * (l_ * h * m_ - t * n_))::int32
+                var y: int32 = (12.0 + 15.0 * D * (l_ * h * n_ + t * m_))::int32
+
+                var o: int32 = x + 80 * y
+                var N: int32 = (8.0 * ((f_ * e_ - c_ * d_ * g_) * m_ - c_ * d_ * e_ - f_ * g_ - l_ * d_ * n_))::int32
+
+                if 22 > y
+                begin
+                    if y > 0
+                    begin
+                        if x > 0
+                        begin
+                            if 80 > x
+                            begin
+                                if D > z[o]
+                                begin
+                                    z[o] = D
+                                    var idx: int32 = N > 0 ? N : 0
+                                    var ramp: [char; 13] = ".,-~:;=!*#$@"
+                                    b[o] = ramp[idx]
+                                end
+                            end
+                        end
+                    end
+                end
+
+                i += 0.02
+            end
+            j += 0.07
+        end
+
+        print("\x1b[H")
+
+        k = 0
+        while k < 1761
+        begin
+            if k % 80 == 0
+            begin
+                putchar(10)
+            else
+            begin
+                putchar(b[k]::int32)
+            end
+            A += 0.00004
+            B += 0.00002
+            k += 1
+        end
+
+        usleep(5000)
+    end
+
+    return 0
+end

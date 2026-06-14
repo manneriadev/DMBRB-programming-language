@@ -106,6 +106,10 @@ enum class TokenType{
     STRUCT,
 
     // other
+    IMPORT,
+    EXPORT,
+    AS,
+
     NEWLINE,
     ERROR,
     END_TOKEN

@@ -335,6 +335,13 @@ void ASTPrinter::visit(StructDecl& node)
     current_space -= 5;
 }
 
+void ASTPrinter::visit(ImportDecl& node)
+{
+    std::string text = "Import: " + node.path;
+    if(!node.alias.empty()) text += " as " + node.alias;
+    print_node(text);
+}
+
 void ASTPrinter::visit(Module& node)
 {
     print_node("Module: " + node.name);

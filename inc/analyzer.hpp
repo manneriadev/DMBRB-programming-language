@@ -13,12 +13,15 @@ struct AnyVariable{
     Type type;
     bool is_const = false;
     bool is_initialized = false;
+    bool is_exported = false;
 };
 
 struct AnyFunction{
     std::string name;
+    std::string mangled_name;
     std::vector<Type> args;
     Type return_type;
+    bool is_exported = false;
 };
 
 struct StructField{
@@ -29,19 +32,20 @@ struct StructField{
 struct AnyStruct{
     std::string name;
     std::vector<StructField> fields;
+    bool is_exported = false;
 };
 
 struct AnyModule{
     std::string name;
     std::unordered_map<std::string, AnyVariable> variables;
-    std::unordered_map<std::string, AnyFunction> functions;
+    std::unordered_map<std::string, std::vector<AnyFunction>> functions;
     std::unordered_map<std::string, AnyStruct> structs;
     std::unordered_map<std::string, AnyModule> modules;
 };
 
 struct VisionPart{
     std::unordered_map<std::string, AnyVariable> variables;
-    std::unordered_map<std::string, AnyFunction> functions;
+    std::unordered_map<std::string, std::vector<AnyFunction>> functions;
     std::unordered_map<std::string, AnyStruct> structs;
 };
 
@@ -76,7 +80,10 @@ private:
     bool declare_function(FunctionDecl& node);
     bool declare_struct(StructDecl& node);
     AnyVariable* resolve_variable(const std::string& name);
-    AnyFunction* resolve_function(const std::string& name);
+    std::vector<AnyFunction>* resolve_function_set(const std::string& name);
+    AnyFunction* resolve_overload(std::vector<AnyFunction>* set, const std::vector<Type>& arg_types, const Node* node, const std::string& fname);
+    int conversion_cost(const Type& from, const Type& to) const;
+    std::string build_module_chain_name(Expr* expr);
     AnyStruct* resolve_struct(const std::string& name);
     AnyModule* resolve_module(const std::string& name);
     AnyModule* resolve_module_chain(Expr* expr);
@@ -133,6 +140,7 @@ private:
     void visit(VarDecl& node) override; 
     void visit(FunctionDecl& node) override; 
     void visit(StructDecl& node) override;
+    void visit(ImportDecl&) override;
 
     void visit(Module& node) override;
     void visit(Program& node) override;

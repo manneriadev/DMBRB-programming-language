@@ -44,6 +44,10 @@ static std::unordered_map<std::string, TokenType> keywords = {
     {"char", TokenType::CHAR},
     {"void", TokenType::VOID},
     {"struct", TokenType::STRUCT},
+
+    {"import", TokenType::IMPORT},
+    {"export", TokenType::EXPORT},
+    {"as",     TokenType::AS},
 };
 
 void Lexer::push_index(size_t n)

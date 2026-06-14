@@ -158,6 +158,7 @@ struct AssignmentExpr : Expr{
 
 struct CallExpr : Expr{
     std::string name;
+    std::string resolved_name;
     std::vector<std::unique_ptr<Expr>> args;
     void accept(Visitor& v) override;
 };
@@ -171,6 +172,7 @@ struct MemberAccessExpr : Expr{
 struct MethodCallExpr : Expr{
     std::unique_ptr<Expr> object;
     std::string method;
+    std::string resolved_name;
     bool is_struct_method = false;
     std::string struct_name; // full name
     std::vector<std::unique_ptr<Expr>> args;
@@ -266,14 +268,17 @@ struct VarDecl : Decl{
     bool has_type = false;
     std::unique_ptr<Expr> init;
     bool has_init = false;
+    bool is_exported = false;
     void accept(Visitor& v) override;
 };
 
 struct FunctionDecl : Decl{
     std::string name;
+    std::string mangled_name;
     std::vector<pair_arg> args;
     Type return_type;
     std::unique_ptr<BlockStmt> body;
+    bool is_exported = false;
     void accept(Visitor& v) override;
 };
 
@@ -281,6 +286,13 @@ struct StructDecl : Decl{
     std::string name;
     std::vector<pair_arg> fields;
     std::vector<std::unique_ptr<FunctionDecl>> decls;
+    bool is_exported = false;
+    void accept(Visitor& v) override;
+};
+
+struct ImportDecl : Decl{
+    std::string path;
+    std::string alias;
     void accept(Visitor& v) override;
 };
 
@@ -334,6 +346,7 @@ struct Visitor{
     virtual void visit(VarDecl&) = 0;
     virtual void visit(FunctionDecl&) = 0;
     virtual void visit(StructDecl&) = 0;
+    virtual void visit(ImportDecl&) = 0;
 
     // module/program
 
@@ -373,3 +386,4 @@ inline void FunctionDecl::accept(Visitor& v) { v.visit(*this); }
 inline void StructDecl::accept(Visitor& v) { v.visit(*this); }
 inline void Module::accept(Visitor& v) { v.visit(*this); }
 inline void Program::accept(Visitor& v) { v.visit(*this); }
+inline void ImportDecl::accept(Visitor& v) { v.visit(*this); }

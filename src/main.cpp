@@ -1,11 +1,15 @@
 #include "lexer.hpp"
 #include "parser.hpp"
+#include "module_loader.hpp"
 #include "ASTPrinter.hpp"
 #include "analyzer.hpp"
 #include "codegen.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 static std::string read_file(const std::string& path)
 {
@@ -23,9 +27,7 @@ static void dump_tokens(const std::vector<Token>& tokens)
 {
     std::cout << "TOKENS:\n\n";
     for(const auto& token : tokens)
-        std::cout << "[" << static_cast<int>(token.type) << "] "
-                  << "'" << token.lexeme << "' "
-                  << "(" << token.line << ":" << token.column << ")" << "\n";
+        std::cout << "[" << static_cast<int>(token.type) << "] " << "'" << token.lexeme << "' " << "(" << token.line << ":" << token.column << ")" << "\n";
 }
 
 int main(int argc, char** argv)
@@ -57,6 +59,13 @@ int main(int argc, char** argv)
             std::cerr << "parser failed\n";
             return 1;
         }
+
+        std::string base_dir = fs::path(filepath).parent_path().string();
+        if(base_dir.empty()) base_dir = ".";
+
+        ModuleLoader loader(base_dir);
+        auto imported = loader.resolve(*program);
+        for(int i = (int)imported.size() - 1; i >= 0; --i) program->items.insert(program->items.begin(), std::move(imported[i]));
 
         analyzer sem;
         sem.analyze(*program);

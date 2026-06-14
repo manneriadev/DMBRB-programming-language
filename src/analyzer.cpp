@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cstdio>
+#include <algorithm>
 
 void analyzer::push_new_vision()
 {
@@ -72,7 +73,7 @@ bool analyzer::declare_variable(VarDecl& node)
         return false;
     }
 
-    current[node.name] = AnyVariable{.name = node.name, .type = final_type};
+    current[node.name] = AnyVariable{.name = node.name, .type = final_type, .is_const = node.type.is_const};
 
     if(!node.has_type)
     {
@@ -85,20 +86,39 @@ bool analyzer::declare_variable(VarDecl& node)
 bool analyzer::declare_function(FunctionDecl& node)
 {
     auto& current = visions.back().functions;
+    auto& overloads = current[node.name];
 
-    if(current.find(node.name) != current.end())
+    for(auto& f : overloads) // without same overloads 
     {
-        error("double declaration of function: " + node.name, &node);
-        return false;
+        if(f.args.size() != node.args.size()) continue;
+
+        bool same = true;
+        for(size_t i = 0; i < f.args.size(); i++)
+        {
+            if(!type_equal(f.args[i], node.args[i].type.type)) 
+            { 
+                same = false; 
+                break; 
+            }
+        }
+
+        if(same)
+        {
+            error("duplicate overload of function: " + node.name, &node);
+            return false;
+        }
     }
 
     AnyFunction func;
     func.name = node.name;
     func.return_type = node.return_type;
-
     for(const auto& a : node.args) func.args.push_back(a.type.type);
 
-    current[node.name] = func;
+    size_t idx = overloads.size();
+    func.mangled_name = (idx == 0) ? node.name : (node.name + "_ov" + std::to_string(idx));
+    node.mangled_name = func.mangled_name;
+
+    overloads.push_back(func);
     return true;
 }
 
@@ -130,12 +150,44 @@ bool analyzer::declare_struct(StructDecl& node)
 
     for(auto& method : node.decls)
     {
-        std::string mangled = full_name + "__" + method->name;
+        std::string key = full_name + "__" + method->name;
+        auto& overloads = visions.back().functions[key];
+
+        bool dup = false;
+        for(auto& f : overloads)
+        {
+            if(f.args.size() != method->args.size()) continue;
+            bool same = true;
+            for(size_t i = 0; i < f.args.size(); i++)
+            {
+                if(!type_equal(f.args[i], method->args[i].type.type)) 
+                { 
+                    same = false; 
+                    break; 
+                }
+            }
+            if(same) 
+            { 
+                dup = true; 
+                break; 
+            }
+        }
+        if(dup)
+        {
+            error("duplicate overload of method: " + method->name, method.get());
+            continue;
+        }
+
         AnyFunction func;
-        func.name = mangled;
+        func.name = method->name;
         func.return_type = method->return_type;
         for(auto& a : method->args) func.args.push_back(a.type.type);
-        visions.back().functions[mangled] = func;
+
+        size_t idx = overloads.size();
+        func.mangled_name = (idx == 0) ? key : (key + "_ov" + std::to_string(idx));
+        method->mangled_name = func.mangled_name;
+
+        overloads.push_back(func);
     }
 
     auto prev_self = current_self_type;
@@ -164,15 +216,108 @@ AnyVariable* analyzer::resolve_variable(const std::string& name)
     return nullptr;
 }
 
-AnyFunction* analyzer::resolve_function(const std::string& name)
+std::vector<AnyFunction>* analyzer::resolve_function_set(const std::string& name)
 {
     for(auto it = visions.rbegin(); it != visions.rend(); ++it)
     {
         auto found = it->functions.find(name);
-        if(found != it->functions.end())return &found->second;
+        if(found != it->functions.end()) return &found->second;
     }
 
     return nullptr;
+}
+
+int analyzer::conversion_cost(const Type& from, const Type& to) const
+{
+    if(type_equal(from, to)) return 0;
+    if(!can_convert(from, to)) return -1;
+    if(is_integer(from) && is_integer(to)) return 1;
+    if(is_float(from) && is_float(to)) return 1;
+    if(is_integer(from) && is_float(to)) return 2;
+    return 1;
+}
+
+AnyFunction* analyzer::resolve_overload(std::vector<AnyFunction>* set, const std::vector<Type>& arg_types, const Node* node, const std::string& fname)
+{
+    if(!set || set->empty())
+    {
+        error("undefined function: " + fname, node);
+        return nullptr;
+    }
+
+    std::vector<AnyFunction*> arity_matches;
+    for(auto& f : *set) if(f.args.size() == arg_types.size()) arity_matches.push_back(&f);
+
+    if(arity_matches.empty())
+    {
+        error("no overload of '" + fname + "' matches argument count", node);
+        return nullptr;
+    }
+
+    for(auto* f : arity_matches)
+    {
+        bool exact = true;
+        for(size_t i = 0; i < arg_types.size(); i++)
+        {
+            if(!type_equal(arg_types[i], f->args[i])) { exact = false; break; }
+        }
+        if(exact) return f;
+    }
+
+    std::vector<std::pair<AnyFunction*, int>> candidates;
+    for(auto* f : arity_matches)
+    {
+        int total = 0;
+        bool ok = true;
+        for(size_t i = 0; i < arg_types.size(); i++)
+        {
+            int c = conversion_cost(arg_types[i], f->args[i]);
+            if(c < 0) { ok = false; break; }
+            total += c;
+        }
+        if(ok) candidates.push_back({f, total});
+    }
+
+    if(candidates.empty())
+    {
+        error("no matching overload for '" + fname + "'", node);
+        return nullptr;
+    }
+
+    int best = candidates[0].second;
+    for(auto& c : candidates) best = std::min(best, c.second);
+
+    AnyFunction* result = nullptr;
+    int count_best = 0;
+    for(auto& c : candidates)
+    {
+        if(c.second == best) 
+        {
+            ++count_best; 
+            result = c.first; 
+        }
+    }
+
+    if(count_best > 1)
+    {
+        error("ambiguous call to overloaded function '" + fname + "'", node); // two or more overloads near
+        return nullptr;
+    }
+
+    return result;
+}
+
+std::string analyzer::build_module_chain_name(Expr* expr)
+{
+    std::string mod_name;
+    Expr* obj = expr;
+    while(auto* mem = dynamic_cast<MemberAccessExpr*>(obj))
+    {
+        mod_name = mem->field + (mod_name.empty() ? "" : "__" + mod_name);
+        obj = mem->object.get();
+    }
+    if(auto* var = dynamic_cast<VariableExpr*>(obj)) mod_name = var->name + (mod_name.empty() ? "" : "__" + mod_name);
+    return mod_name;
 }
 
 AnyStruct* analyzer::resolve_struct(const std::string& name)
@@ -303,7 +448,7 @@ bool analyzer::type_equal(const Type& a, const Type& b) const
 
 bool analyzer::can_convert(const Type& from, const Type& to) const
 {
-    return (is_integer(from) && is_float(to) || is_float(from) && is_float(to) || is_integer(from) && is_integer(to) || type_equal(from, to)) ? true : false;
+    return (is_integer(from) && is_float(to) || is_float(from) && is_float(to) || is_integer(from) && is_integer(to) || type_equal(from, to) || (from.is_pointer && from.base == InnerType::VOID && to.is_pointer) || (to.is_pointer && to.base == InnerType::VOID && from.is_pointer)) ? true : false;
 }
 
 bool analyzer::is_comparable(const Type& a, const Type& b) const
@@ -705,31 +850,140 @@ void analyzer::visit(CallExpr& node)
         return;
     }
 
-    auto func = resolve_function(node.name);
-
-    if(!func)
+    if(node.name == "system")
     {
-        error("undefined function: " + node.name, &node);
+        if(node.args.size() != 1) 
+        { 
+            error("system expects 1 argument", &node); 
+            return; 
+        }
+        visit_expr(*node.args[0]);
+        current_expr_type = Type{InnerType::VOID};
         return;
     }
 
-    if(func->args.size() != node.args.size())
+    if(node.name == "sin" || node.name == "cos")
     {
-        error("argument count mismatch in call: " + node.name, &node);
-        return;
-    }
-
-    for(size_t i = 0; i < node.args.size(); i++)
-    {
-        Type arg_t = visit_expr(*node.args[i]);
-
-        if(!can_convert(arg_t, func->args[i]))
+        if(node.args.size() != 1)
         {
-            error("argument type mismatch in call: " + node.name, &node);
+            error(node.name + " expects 1 argument", &node);
             return;
         }
+        Type t = visit_expr(*node.args[0]);
+        if(!is_numeric(t))
+        {
+            error(node.name + " expects numeric argument", &node);
+            return;
+        }
+        current_expr_type = Type{InnerType::FLOAT32};
+        return;
     }
 
+    if(node.name == "memset")
+    {
+        if(node.args.size() != 3)
+        {
+            error("memset expects 3 arguments", &node);
+            return;
+        }
+        Type dst = visit_expr(*node.args[0]);
+        if(!dst.is_array && !dst.is_pointer)
+        {
+            error("memset first argument must be array or pointer", &node);
+            return;
+        }
+        Type val = visit_expr(*node.args[1]);
+        Type sz = visit_expr(*node.args[2]);
+        if(!is_integer(val) || !is_integer(sz))
+        {
+            error("memset value/size must be integer", &node);
+            return;
+        }
+        current_expr_type = Type{InnerType::VOID};
+        return;
+    }
+
+    if(node.name == "putchar")
+    {
+        if(node.args.size() != 1)
+        {
+            error("putchar expects 1 argument", &node);
+            return;
+        }
+        Type t = visit_expr(*node.args[0]);
+        if(!is_integer(t))
+        {
+            error("putchar expects integer argument", &node);
+            return;
+        }
+        current_expr_type = Type{InnerType::INT32};
+        return;
+    }
+
+    if(node.name == "usleep")
+    {
+        if(node.args.size() != 1)
+        {
+            error("usleep expects 1 argument", &node);
+            return;
+        }
+        Type t = visit_expr(*node.args[0]);
+        if(!is_integer(t))
+        {
+            error("usleep expects integer argument", &node);
+            return;
+        }
+        current_expr_type = Type{InnerType::INT32};
+        return;
+    }
+
+    if(node.name == "malloc")
+    {
+        if(node.args.size() != 1) 
+        { 
+            error("malloc expects 1 argument", &node); 
+            return; 
+        }
+        Type t = visit_expr(*node.args[0]);
+        if(!is_integer(t)) 
+        { 
+            error("malloc expects integer argument", &node); 
+            return; 
+        }
+        Type result{};
+        result.base = InnerType::VOID;
+        result.is_pointer = true;
+        current_expr_type = result;
+        return;
+    }
+
+    if(node.name == "free")
+    {
+        if(node.args.size() != 1) 
+        { 
+            error("free expects 1 argument", &node); 
+            return; 
+        }
+        Type t = visit_expr(*node.args[0]);
+        if(!t.is_pointer) 
+        { 
+            error("free expects pointer argument", &node); 
+            return; 
+        }
+        current_expr_type = Type{InnerType::VOID};
+        return;
+    }
+
+    auto* set = resolve_function_set(node.name);
+
+    std::vector<Type> arg_types;
+    arg_types.reserve(node.args.size());
+    for(auto& a : node.args) arg_types.push_back(visit_expr(*a));
+
+    AnyFunction* func = resolve_overload(set, arg_types, &node, node.name);
+    if(!func) return;
+
+    node.resolved_name = func->mangled_name;
     current_expr_type = func->return_type;
 }
 
@@ -741,6 +995,11 @@ void analyzer::visit(MemberAccessExpr& node)
         auto it = mod->variables.find(node.field);
         if(it != mod->variables.end())
         {
+            if(!it->second.is_exported)
+            {
+                error("'" + node.field + "' is private to its module", &node);
+                return;
+            }
             current_expr_type = it->second.type;
             return;
         }
@@ -778,31 +1037,33 @@ void analyzer::visit(MethodCallExpr& node)
     if(mod)
     {
         auto it = mod->functions.find(node.method);
-        if(it == mod->functions.end())
+        if(it == mod->functions.end() || it->second.empty())
         {
             error("unknown function in module: " + node.method, &node);
             return;
         }
-        AnyFunction& func = it->second;
-        if(func.args.size() != node.args.size())
+        if(!it->second[0].is_exported)
         {
-            error("argument count mismatch: " + node.method, &node);
+            error("function '" + node.method + "' is private to its module", &node);
             return;
         }
-        for(size_t i = 0; i < node.args.size(); i++)
-        {
-            Type arg_t = visit_expr(*node.args[i]);
-            if(!can_convert(arg_t, func.args[i]))
-            {
-                error("argument type mismatch: " + node.method, &node);
-                return;
-            }
-        }
-        current_expr_type = func.return_type;
+
+        std::vector<Type> arg_types;
+        arg_types.reserve(node.args.size());
+        for(auto& a : node.args) arg_types.push_back(visit_expr(*a));
+
+        AnyFunction* func = resolve_overload(&it->second, arg_types, &node, node.method);
+        if(!func) return;
+
+        std::string mod_chain = build_module_chain_name(node.object.get());
+        node.resolved_name = mod_chain.empty() ? func->mangled_name : (mod_chain + "__" + func->mangled_name);
+
+        current_expr_type = func->return_type;
         return;
     }
 
     // struct method
+
     Type obj_type = visit_expr(*node.object);
     if(obj_type.base != InnerType::STRUCT || obj_type.struct_name.empty())
     {
@@ -810,32 +1071,24 @@ void analyzer::visit(MethodCallExpr& node)
         return;
     }
 
-    std::string mangled = obj_type.struct_name + "__" + node.method;
-    AnyFunction* func = resolve_function(mangled);
-    if(!func)
+    std::string key = obj_type.struct_name + "__" + node.method;
+    auto* set = resolve_function_set(key);
+    if(!set || set->empty())
     {
         error("unknown method '" + node.method + "' on struct " + obj_type.struct_name, &node);
         return;
     }
 
-    if(func->args.size() != node.args.size())
-    {
-        error("argument count mismatch in method: " + node.method, &node);
-        return;
-    }
+    std::vector<Type> arg_types;
+    arg_types.reserve(node.args.size());
+    for(auto& a : node.args) arg_types.push_back(visit_expr(*a));
 
-    for(size_t i = 0; i < node.args.size(); i++)
-    {
-        Type arg_t = visit_expr(*node.args[i]);
-        if(!can_convert(arg_t, func->args[i]))
-        {
-            error("argument type mismatch in method: " + node.method, &node);
-            return;
-        }
-    }
+    AnyFunction* func = resolve_overload(set, arg_types, &node, node.method);
+    if(!func) return;
 
     node.is_struct_method = true;
     node.struct_name = obj_type.struct_name;  // full name
+    node.resolved_name = func->mangled_name;  // full mangled name with ov{num of ov}
     current_expr_type = func->return_type;
 }
 
@@ -888,7 +1141,9 @@ void analyzer::visit(CastExpr& node)
 {
     Type from = visit_expr(*node.expr);
 
-    if(!can_convert(from, node.target_type) && !can_convert(node.target_type, from))
+    bool char_int_cast = (from.base == InnerType::CHAR && is_integer(node.target_type)) || (is_integer(from) && node.target_type.base == InnerType::CHAR);
+
+    if(!can_convert(from, node.target_type) && !can_convert(node.target_type, from) && !char_int_cast)
     {
         error("invalid cast", &node);
         return;
@@ -1101,11 +1356,15 @@ void analyzer::visit(StructDecl& node)
     declare_struct(node);
 }
 
+void analyzer::visit(ImportDecl&) {}
+
 void analyzer::visit(Module& node)
 {
     AnyModule mod;
     mod.name = node.name;
-
+    
+    std::unordered_map<std::string, int> module_overload_counts;
+    
     for(auto& decl : node.decls)
     {
         if(auto* f = dynamic_cast<FunctionDecl*>(decl.get()))
@@ -1114,7 +1373,12 @@ void analyzer::visit(Module& node)
             func.name = f->name;
             func.return_type = f->return_type;
             for(auto& a : f->args) func.args.push_back(a.type.type);
-            mod.functions[f->name] = func;
+
+            int idx = module_overload_counts[f->name]++;
+            func.mangled_name = (idx == 0) ? f->name : (f->name + "_ov" + std::to_string(idx));
+
+            func.is_exported = f->is_exported;
+            mod.functions[f->name].push_back(func);
         }
         else if(auto* s = dynamic_cast<StructDecl*>(decl.get()))
         {
@@ -1127,6 +1391,7 @@ void analyzer::visit(Module& node)
                 field.type = f.type.type;
                 st.fields.push_back(field);
             }
+            st.is_exported = s->is_exported;
             mod.structs[s->name] = st;
         }
         else if(auto* v = dynamic_cast<VarDecl*>(decl.get()))
@@ -1134,6 +1399,7 @@ void analyzer::visit(Module& node)
             AnyVariable var;
             var.name = v->name;
             if(v->has_type) var.type = v->type.type;
+            var.is_exported = v->is_exported;
             mod.variables[v->name] = var;
         }
     }

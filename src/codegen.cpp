@@ -74,6 +74,8 @@ void Codegen::generate(Program& program)
     writeln("#include <stdio.h>");
     writeln("#include <stdlib.h>");
     writeln("#include <math.h>");
+    writeln("#include <string.h>");
+    writeln("#include <unistd.h>");
     writeln("");
     program.accept(*this);
 }
@@ -216,7 +218,67 @@ void Codegen::visit(CallExpr& node)
         return;
     }
 
-    std::string name = current_module.empty() ? node.name : node.name;
+    if(node.name == "sin")
+    {
+        out << "sinf(";
+        node.args[0]->accept(*this);
+        out << ")";
+        return;
+    }
+
+    if(node.name == "cos")
+    {
+        out << "cosf(";
+        node.args[0]->accept(*this);
+        out << ")";
+        return;
+    }
+
+    if(node.name == "memset")
+    {
+        out << "memset(";
+        node.args[0]->accept(*this);
+        out << ", ";
+        node.args[1]->accept(*this);
+        out << ", ";
+        node.args[2]->accept(*this);
+        out << ")";
+        return;
+    }
+
+    if(node.name == "putchar")
+    {
+        out << "putchar(";
+        node.args[0]->accept(*this);
+        out << ")";
+        return;
+    }
+
+    if(node.name == "usleep")
+    {
+        out << "usleep(";
+        node.args[0]->accept(*this);
+        out << ")";
+        return;
+    }
+
+    if(node.name == "malloc")
+    {   
+        out << "malloc(";
+        node.args[0]->accept(*this);
+        out << ")";
+        return;
+    }
+
+    if(node.name == "free")
+    {
+        out << "free(";
+        node.args[0]->accept(*this);
+        out << ")";
+        return;
+    }
+
+    std::string name = node.resolved_name.empty() ? node.name : node.resolved_name;
     out << name << "(";
     for(size_t i = 0; i < node.args.size(); ++i)
     {
@@ -230,7 +292,11 @@ void Codegen::visit(MethodCallExpr& node)
 {
     if(node.is_struct_method)
     {
-        out << node.struct_name << "__" << node.method << "(&";
+        std::string fname = node.resolved_name.empty()
+            ? (node.struct_name + "__" + node.method)
+            : node.resolved_name;
+
+        out << fname << "(&";
         node.object->accept(*this);  // self
         for(auto& arg : node.args)
         {
@@ -241,16 +307,21 @@ void Codegen::visit(MethodCallExpr& node)
         return;
     }
 
-    std::string mod_name;
-    Expr* obj = node.object.get();
-    while(auto* mem = dynamic_cast<MemberAccessExpr*>(obj))
+    std::string fname = node.resolved_name;
+    if(fname.empty())
     {
-        mod_name = mem->field + (mod_name.empty() ? "" : "__" + mod_name);
-        obj = mem->object.get();
+        std::string mod_name;
+        Expr* obj = node.object.get();
+        while(auto* mem = dynamic_cast<MemberAccessExpr*>(obj))
+        {
+            mod_name = mem->field + (mod_name.empty() ? "" : "__" + mod_name);
+            obj = mem->object.get();
+        }
+        if(auto* var = dynamic_cast<VariableExpr*>(obj)) mod_name = var->name + (mod_name.empty() ? "" : "__" + mod_name);
+        fname = mod_name + "__" + node.method;
     }
-    if(auto* var = dynamic_cast<VariableExpr*>(obj)) mod_name = var->name + (mod_name.empty() ? "" : "__" + mod_name);
 
-    out << mod_name << "__" << node.method << "(";
+    out << fname << "(";
     for(size_t i = 0; i < node.args.size(); ++i)
     {
         if(i > 0) out << ", ";
@@ -459,7 +530,8 @@ void Codegen::visit(VarDecl& node)
 
 void Codegen::visit(FunctionDecl& node)
 {
-    std::string fname = mangle(current_module, node.name);
+    std::string local_name = node.mangled_name.empty() ? node.name : node.mangled_name;
+    std::string fname = mangle(current_module, local_name);
     std::string rtype = type_to_c(node.return_type);
 
     out << rtype << " " << fname << "(";
@@ -489,8 +561,9 @@ void Codegen::visit(StructDecl& node)
     current_module = sname;
     for(auto& method : node.decls)
     {
+        std::string mname = method->mangled_name.empty() ? (sname + "__" + method->name) : method->mangled_name;
         out << type_to_c(method->return_type) << " ";
-        out << sname << "__" << method->name << "(" << sname << "* self";
+        out << mname << "(" << sname << "* self";
         for(auto& a : method->args) out << ", " << decl_to_c(a.type.type, a.name);
         out << ") {\n";
         begin_indent();
@@ -500,6 +573,8 @@ void Codegen::visit(StructDecl& node)
     }
     current_module = prev;
 }
+
+void Codegen::visit(ImportDecl&) {} 
 
 void Codegen::visit(Module& node)
 {

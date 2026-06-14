@@ -2,197 +2,72 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
+#include <unistd.h>
 
-int32_t pool[300];
-int32_t pool_size = 0;
-int32_t nval(int32_t i) {
-    return pool[(i * 3)];
-
-}
-
-int32_t nleft(int32_t i) {
-    return pool[((i * 3) + 1)];
-
-}
-
-int32_t nright(int32_t i) {
-    return pool[((i * 3) + 2)];
-
-}
-
-void set_val(int32_t i, int32_t v) {
-    pool[(i * 3)] = v;
-}
-
-void set_left(int32_t i, int32_t v) {
-    pool[((i * 3) + 1)] = v;
-}
-
-void set_right(int32_t i, int32_t v) {
-    pool[((i * 3) + 2)] = v;
-}
-
-int32_t new_node(int32_t v) {
-    int32_t idx = pool_size;
-    set_val(idx, v);
-    set_left(idx, (-1));
-    set_right(idx, (-1));
-    pool_size = (pool_size + 1);
-    return idx;
-
-}
-
-int32_t insert(int32_t root, int32_t v) {
-    if ((root == (-1))) {
-        return new_node(v);
-
-    }
-    if ((v < nval(root))) {
-        set_left(root, insert(nleft(root), v));
-    }
-    if ((v > nval(root))) {
-        set_right(root, insert(nright(root), v));
-    }
-    return root;
-
-}
-
-int32_t search(int32_t root, int32_t v) {
-    if ((root == (-1))) {
-        return 0;
-
-    }
-    if ((v == nval(root))) {
-        return 1;
-
-    }
-    if ((v < nval(root))) {
-        return search(nleft(root), v);
-
-    }
-    return search(nright(root), v);
-
-}
-
-int32_t find_min(int32_t root) {
-    int32_t cur = root;
-    while ((nleft(cur) != (-1))) {
-        cur = nleft(cur);
-    }
-    return cur;
-
-}
-
-int32_t delete(int32_t root, int32_t v) {
-    if ((root == (-1))) {
-        return (-1);
-
-    }
-    if ((v < nval(root))) {
-        set_left(root, delete(nleft(root), v));
-        return root;
-
-    }
-    if ((v > nval(root))) {
-        set_right(root, delete(nright(root), v));
-        return root;
-
-    }
-    if ((nleft(root) == (-1))) {
-        return nright(root);
-
-    }
-    if ((nright(root) == (-1))) {
-        return nleft(root);
-
-    }
-    int32_t m = find_min(nright(root));
-    set_val(root, nval(m));
-    set_right(root, delete(nright(root), nval(m)));
-    return root;
-
-}
-
-void inorder(int32_t root) {
-    if ((root == (-1))) {
-        return;
-
-    }
-    inorder(nleft(root));
-    printf("%d ", nval(root));
-    inorder(nright(root));
-}
-
-int32_t height(int32_t root) {
-    if ((root == (-1))) {
-        return 0;
-
-    }
-    int32_t lh = height(nleft(root));
-    int32_t rh = height(nright(root));
-    int32_t h = ((lh > rh) ? lh : rh);
-    return (h + 1);
-
-}
-
-void visual_print_tree(int32_t root, int32_t space, int32_t value) {
-    if ((root == (-1))) {
-        return;
-
-    }
-    if ((nright(root) != (-1))) {
-        visual_print_tree(nright(root), (space + 5), 2);
-    }
-    int32_t i = 0;
-    while ((i < space)) {
-        printf(" ");
-        i = (i + 1);
-    }
-    if ((value == 2)) {
-        printf("/---%d\r\n", nval(root));
-    }
-    if ((value == 1)) {
-        printf("\\---%d\r\n", nval(root));
-    }
-    if ((value == 0)) {
-        printf("%d\r\n", nval(root));
-    }
-    if ((nleft(root) != (-1))) {
-        visual_print_tree(nleft(root), (space + 5), 1);
-    }
-}
-
+float A = 0;
+float B = 0;
+float z[1760];
+char b[1760];
 int32_t main() {
-    int32_t root = (-1);
-    root = insert(root, 50);
-    root = insert(root, 30);
-    root = insert(root, 70);
-    root = insert(root, 20);
-    root = insert(root, 40);
-    root = insert(root, 60);
-    root = insert(root, 80);
-    root = insert(root, 10);
-    root = insert(root, 35);
-    printf("inorder:  ");
-    inorder(root);
-    printf("\r\n");
-    printf("height:   %d\r\n", height(root));
-    printf("search 40: %d\r\n", search(root, 40));
-    printf("search 99: %d\r\n", search(root, 99));
-    printf("\r\n");
-    visual_print_tree(root, 0, 0);
-    printf("\r\n");
-    root = delete(root, 30);
-    printf("after delete 30:\r\n");
-    visual_print_tree(root, 0, 0);
-    printf("\r\n");
-    root = delete(root, 80);
-    printf("after delete 80:\r\n");
-    visual_print_tree(root, 0, 0);
-    printf("\r\n");
-    root = delete(root, 50);
-    printf("after delete 50:\r\n");
-    visual_print_tree(root, 0, 0);
+    float i = 0;
+    float j = 0;
+    int32_t k = 0;
+    printf("\x1b[2J");
+    while (1) {
+        memset(b, 32, 1760);
+        memset(z, 0, 7040);
+        j = 0;
+        while ((j < 6.28)) {
+            i = 0;
+            while ((i < 6.28)) {
+                float c_ = sinf(i);
+                float d_ = cosf(j);
+                float e_ = sinf(A);
+                float f_ = sinf(j);
+                float g_ = cosf(A);
+                float l_ = cosf(i);
+                float m_ = cosf(B);
+                float n_ = sinf(B);
+                float h = (d_ + 2);
+                float D = (1 / ((((c_ * h) * e_) + (f_ * g_)) + 5));
+                float t = (((c_ * h) * g_) - (f_ * e_));
+                int32_t x = ((int32_t)((40 + ((30 * D) * (((l_ * h) * m_) - (t * n_))))));
+                int32_t y = ((int32_t)((12 + ((15 * D) * (((l_ * h) * n_) + (t * m_))))));
+                int32_t o = (x + (80 * y));
+                int32_t N = ((int32_t)((8 * ((((((f_ * e_) - ((c_ * d_) * g_)) * m_) - ((c_ * d_) * e_)) - (f_ * g_)) - ((l_ * d_) * n_)))));
+                if ((22 > y)) {
+                    if ((y > 0)) {
+                        if ((x > 0)) {
+                            if ((80 > x)) {
+                                if ((D > z[o])) {
+                                    z[o] = D;
+                                    int32_t idx = ((N > 0) ? N : 0);
+                                    char ramp[13] = ".,-~:;=!*#$@";
+                                    b[o] = ramp[idx];
+                                }
+                            }
+                        }
+                    }
+                }
+                i += 0.02;
+            }
+            j += 0.07;
+        }
+        printf("\x1b[H");
+        k = 0;
+        while ((k < 1761)) {
+            if (((k % 80) == 0)) {
+                putchar(10);
+            } else {
+                putchar(((int32_t)(b[k])));
+            }
+            A += 4e-05;
+            B += 2e-05;
+            k += 1;
+        }
+        usleep(5000);
+    }
     return 0;
 
 }

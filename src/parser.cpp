@@ -124,7 +124,9 @@ bool Parser::is_decl_start(TokenType type) const
 {
     return type == TokenType::VAR
         || type == TokenType::FUNCTION
-        || type == TokenType::STRUCT;
+        || type == TokenType::STRUCT
+        || type == TokenType::IMPORT
+        || type == TokenType::EXPORT;
 }
 
 bool Parser::is_stmt_start(TokenType type) const 
@@ -363,12 +365,90 @@ std::unique_ptr<Module> Parser::parse_module()
 
 std::unique_ptr<Decl> Parser::parse_decl() 
 {
+    if(match(TokenType::IMPORT)) return parse_import_decl();
+    if(match(TokenType::EXPORT)) return parse_export_decl();
     if(match(TokenType::VAR)) return parse_var_decl();
     if(match(TokenType::FUNCTION)) return parse_function_decl();
     if(match(TokenType::STRUCT)) return parse_struct_decl();
 
     fail("expected declaration");
     return nullptr;
+}
+
+std::unique_ptr<Decl> Parser::parse_import_decl()
+{
+    auto decl = std::make_unique<ImportDecl>();
+    get_pos(decl.get());
+    if(!eat(TokenType::IMPORT)) 
+    { 
+        fail("expected 'import'"); 
+        return nullptr; 
+    }
+
+    if(match(TokenType::STRING_LITERAL)) // 'seraw/sersr/esrser/file' 
+    {
+        decl->path = cur()->lexeme;
+        next();
+    }
+    else if(match(TokenType::IDENTIFIER)) // math.func -> '/math/func' 
+    {
+        decl->path = cur()->lexeme;
+        next();
+        while(eat(TokenType::DOT))
+        {
+            if(!match(TokenType::IDENTIFIER))
+            { 
+                fail("expected name after '.'");
+                return nullptr;
+            }
+            decl->path += "/" + cur()->lexeme;
+            next();
+        }
+    }
+    else 
+    { 
+        fail("expected module name or path after 'import'"); 
+        return nullptr; 
+    }
+
+    if(eat(TokenType::AS))
+    {
+        if(!match(TokenType::IDENTIFIER))
+        { 
+            fail("expected alias after 'as'"); 
+            return nullptr; 
+        }
+        decl->alias = cur()->lexeme;
+        next();
+    }
+    return decl;
+}
+
+std::unique_ptr<Decl> Parser::parse_export_decl()
+{
+    if(!eat(TokenType::EXPORT))
+    { 
+        fail("expected 'export'"); 
+        return nullptr; 
+    }
+
+    std::unique_ptr<Decl> inner;
+    if(match(TokenType::VAR)) inner = parse_var_decl();
+    else if(match(TokenType::FUNCTION)) inner = parse_function_decl();
+    else if(match(TokenType::STRUCT)) inner = parse_struct_decl();
+    else 
+    { 
+        fail("expected declaration after 'export'"); 
+        return nullptr; 
+    }
+
+    if(failed || !inner) return nullptr;
+
+    if(auto* f = dynamic_cast<FunctionDecl*>(inner.get())) f->is_exported = true;
+    else if(auto* v = dynamic_cast<VarDecl*>(inner.get())) v->is_exported = true;
+    else if(auto* s = dynamic_cast<StructDecl*>(inner.get())) s->is_exported = true;
+
+    return inner;
 }
 
 std::unique_ptr<VarDecl> Parser::parse_var_decl() 
@@ -1141,15 +1221,17 @@ std::unique_ptr<Expr> Parser::parse_unary()
         return node;
     }
 
-    if(match(TokenType::LPAREN)) return parse_group();
+    if(match(TokenType::LPAREN))
+    {
+        auto expr = parse_group();
+        if(failed) return nullptr;
+        return parse_postfix_tail(std::move(expr));
+    }
     return parse_postfix();
 }
 
-std::unique_ptr<Expr> Parser::parse_postfix()
+std::unique_ptr<Expr> Parser::parse_postfix_tail(std::unique_ptr<Expr> expr)
 {
-    auto expr = parse_primary();
-    if(failed) return nullptr;
-
     while(cur())
     {
         if(eat(TokenType::DOT))
@@ -1257,11 +1339,16 @@ std::unique_ptr<Expr> Parser::parse_postfix()
             expr = std::move(node);
             continue;
         }
-
         break;
     }
-
     return expr;
+}
+
+std::unique_ptr<Expr> Parser::parse_postfix()
+{
+    auto expr = parse_primary();
+    if(failed) return nullptr;
+    return parse_postfix_tail(std::move(expr));
 }
 
 std::unique_ptr<Expr> Parser::parse_primary()

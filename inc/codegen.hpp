@@ -56,6 +56,7 @@ private:
     void visit(VarDecl&) override;
     void visit(FunctionDecl&) override;
     void visit(StructDecl&) override;
+    void visit(ImportDecl&) override;
     void visit(Module&) override;
     void visit(Program&) override;
 
