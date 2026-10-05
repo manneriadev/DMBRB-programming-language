@@ -448,12 +448,20 @@ bool analyzer::type_equal(const Type& a, const Type& b) const
 
 bool analyzer::can_convert(const Type& from, const Type& to) const
 {
-    return (is_integer(from) && is_float(to) || is_float(from) && is_float(to) || is_integer(from) && is_integer(to) || type_equal(from, to) || (from.is_pointer && from.base == InnerType::VOID && to.is_pointer) || (to.is_pointer && to.base == InnerType::VOID && from.is_pointer)) ? true : false;
+    return (is_integer(from) && is_float(to))
+        || (is_float(from) && is_float(to))
+        || (is_integer(from) && is_integer(to))
+        || type_equal(from, to)
+        || (from.is_pointer && from.base == InnerType::VOID && to.is_pointer)
+        || (to.is_pointer && to.base == InnerType::VOID && from.is_pointer);
 }
 
 bool analyzer::is_comparable(const Type& a, const Type& b) const
 {
-    return (type_equal(a,b) || is_numeric(a) && is_numeric(b) || is_string(a) && is_string(b) || is_bool(a) && is_bool(b)) ? true : false;
+        return type_equal(a, b)
+        || (is_numeric(a) && is_numeric(b))
+        || (is_string(a) && is_string(b))
+        || (is_bool(a) && is_bool(b));
 }
 
 void analyzer::analyze(Program& program)
@@ -1183,7 +1191,7 @@ void analyzer::visit(ArrayLiteralExpr& node)
     current_expr_type = result;
 }
 
-void analyzer::visit(EmptyExpr& node)
+void analyzer::visit(EmptyExpr&)
 {
     Type t;
     t.base = InnerType::VOID;

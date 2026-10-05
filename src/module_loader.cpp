@@ -1,7 +1,7 @@
 //module_loader.cpp
 
 #include "module_loader.hpp"
-#include "lexer.hpp"
+#include "Lexer.hpp"
 #include "parser.hpp"
 #include <fstream>
 #include <sstream>
