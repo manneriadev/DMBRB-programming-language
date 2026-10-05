@@ -1,6 +1,6 @@
 module math 
 begin
-    struct Point 
+    export struct Point 
     begin
         x: int32
         y: int32
@@ -16,12 +16,12 @@ begin
         end
     end
 
-    function sum(a: int32, b: int32)::int32 
+    export function sum(a: int32, b: int32)::int32 
     begin
         return a + b
     end
 
-    function fact(n: int32)::int32 
+    export function fact(n: int32)::int32 
     begin
         var result: int32 = 1
         var i: int32 = 1
@@ -33,12 +33,12 @@ begin
         return result
     end
 
-    function max(a: int32, b: int32)::int32
+    export function max(a: int32, b: int32)::int32
     begin
         return a > b ? a : b
     end
 
-    function abs_val(x: int32)::int32
+    export function abs_val(x: int32)::int32
     begin
         return x < 0 ? -x : x
     end
@@ -217,5 +217,14 @@ begin
     # const переменная
     var const PI: float64 = 3.14159
 
+    if c == 30
+    begin
+        if d == 120
+        begin
+            putchar(79)
+            putchar(75)
+            putchar(10)
+        end
+    end
     return 0
 end
